@@ -250,10 +250,58 @@ if (!$customer) {
 // Müşterinin poliçelerini al
 $policies_table = $wpdb->prefix . 'insurance_crm_policies';
 $policies = $wpdb->get_results($wpdb->prepare("
-    SELECT * FROM $policies_table 
-    WHERE customer_id = %d
-    ORDER BY end_date ASC
+    SELECT p.*, c.first_name, c.last_name, c.tc_identity, c.spouse_name, c.spouse_tc_identity, 
+           c.children_names, c.children_tc_identities
+    FROM $policies_table p
+    LEFT JOIN $customers_table c ON p.customer_id = c.id
+    WHERE p.customer_id = %d
+    ORDER BY p.end_date ASC
 ", $customer_id));
+
+// Sigortalı listesini parse etmek için fonksiyon (policies-view.php'den alınmıştır)
+function parse_insured_list_customer_view($insured_list, $policy) {
+    if (empty($insured_list)) return [];
+    
+    $insured_persons = array();
+    $names = explode(',', $insured_list);
+    
+    foreach ($names as $name) {
+        $name = trim($name);
+        if (empty($name)) continue;
+        
+        $person = array('name' => $name, 'tc' => 'Belirtilmemiş', 'type' => 'Diğer');
+        
+        // Müşterinin kendisi mi kontrol et
+        $customer_full_name = trim($policy->first_name . ' ' . $policy->last_name);
+        if ($name === $customer_full_name) {
+            $person['tc'] = $policy->tc_identity ?: 'Belirtilmemiş';
+            $person['type'] = 'Müşteri';
+        }
+        // Eş mi kontrol et
+        elseif (!empty($policy->spouse_name) && $name === trim($policy->spouse_name)) {
+            $person['tc'] = $policy->spouse_tc_identity ?: 'Belirtilmemiş';
+            $person['type'] = 'Eş';
+        }
+        // Çocuk mu kontrol et
+        elseif (!empty($policy->children_names)) {
+            $children_names = explode(',', $policy->children_names);
+            $children_tcs = !empty($policy->children_tc_identities) ? explode(',', $policy->children_tc_identities) : array();
+            
+            foreach ($children_names as $index => $child_name) {
+                $child_name = trim($child_name);
+                if ($name === $child_name) {
+                    $person['tc'] = isset($children_tcs[$index]) ? trim($children_tcs[$index]) : 'Belirtilmemiş';
+                    $person['type'] = 'Çocuk';
+                    break;
+                }
+            }
+        }
+        
+        $insured_persons[] = $person;
+    }
+    
+    return $insured_persons;
+}
 
 // Müşterinin görevlerini al
 $tasks_table = $wpdb->prefix . 'insurance_crm_tasks';
@@ -1319,6 +1367,7 @@ function format_file_size($size) {
                                 <th>Bitiş</th>
                                 <th>Prim</th>
                                 <th>Durum</th>
+                                <th>Sigortalılar</th>
                                 <th>İşlemler</th>
                             </tr>
                         </thead>
@@ -1327,6 +1376,9 @@ function format_file_size($size) {
                                 $is_expired = strtotime($policy->end_date) < time();
                                 $is_expiring_soon = !$is_expired && (strtotime($policy->end_date) - time()) < (30 * 24 * 60 * 60); // 30 gün
                                 $row_class = $is_expired ? 'expired' : ($is_expiring_soon ? 'expiring-soon' : '');
+                                
+                                // Parse insured list with TC numbers
+                                $insured_persons = parse_insured_list_customer_view($policy->insured_list ?? '', $policy);
                             ?>
                                 <tr class="<?php echo $row_class; ?>">
                                     <td>
@@ -1347,6 +1399,30 @@ function format_file_size($size) {
                                         <span class="ab-badge ab-badge-status-<?php echo esc_attr($policy->status); ?>">
                                             <?php echo esc_html($policy->status); ?>
                                         </span>
+                                    </td>
+                                    <td>
+                                        <?php if (!empty($insured_persons)): ?>
+                                            <div class="insured-list">
+                                                <?php foreach ($insured_persons as $person): 
+                                                    // Tip ikonları
+                                                    $icon = 'fas fa-user';
+                                                    if ($person['type'] === 'Müşteri') $icon = 'fas fa-user-tie';
+                                                    elseif ($person['type'] === 'Eş') $icon = 'fas fa-user-friends';
+                                                    elseif ($person['type'] === 'Çocuk') $icon = 'fas fa-child';
+                                                ?>
+                                                    <div class="insured-person">
+                                                        <span class="insured-name">
+                                                            <i class="<?php echo $icon; ?>"></i>
+                                                            <?php echo esc_html($person['name']); ?>
+                                                        </span>
+                                                        <small class="insured-tc">TC: <?php echo esc_html($person['tc']); ?></small>
+                                                        <small class="insured-type">(<?php echo esc_html($person['type']); ?>)</small>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-muted">Belirtilmemiş</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <div class="ab-actions">
@@ -3716,3 +3792,93 @@ jQuery(document).ready(function($) {
     };
 });
 </script>
+
+<style>
+/* Insured people display styling for customers-view.php */
+.insured-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 250px;
+}
+
+.insured-person {
+    background: #f8f9fa;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border-left: 3px solid #007cba;
+    font-size: 12px;
+    line-height: 1.3;
+}
+
+.insured-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 3px;
+}
+
+.insured-name i {
+    color: #007cba;
+    font-size: 11px;
+}
+
+.insured-tc {
+    display: block;
+    color: #6c757d;
+    font-size: 11px;
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin: 2px 0;
+    display: inline-block;
+}
+
+.insured-type {
+    color: #6c757d;
+    font-size: 11px;
+    font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .insured-list {
+        max-width: 200px;
+    }
+    
+    .insured-person {
+        padding: 6px 8px;
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 768px) {
+    .ab-crm-table {
+        font-size: 12px;
+    }
+    
+    .insured-list {
+        max-width: 150px;
+    }
+    
+    .insured-person {
+        padding: 4px 6px;
+        font-size: 10px;
+    }
+    
+    .insured-name {
+        margin-bottom: 2px;
+    }
+    
+    .insured-tc {
+        font-size: 9px;
+        padding: 1px 4px;
+    }
+    
+    .insured-type {
+        font-size: 9px;
+    }
+}
+</style>

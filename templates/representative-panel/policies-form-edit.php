@@ -15,6 +15,11 @@ global $wpdb;
 $policies_table = $wpdb->prefix . 'insurance_crm_policies';
 $customers_table = $wpdb->prefix . 'insurance_crm_customers';
 
+// Get insurance companies from settings (like policies-form.php)
+$settings = get_option('insurance_crm_settings', []);
+$insurance_companies = array_unique($settings['insurance_companies'] ?? ['Sompo']);
+sort($insurance_companies);
+
 // Ensure gross_premium column exists
 $gross_premium_exists = $wpdb->get_row("SHOW COLUMNS FROM $policies_table LIKE 'gross_premium'");
 if (!$gross_premium_exists) {
@@ -145,7 +150,29 @@ if (!$customer) {
 
 // For renewal, adjust dates and clear certain fields
 if ($renewing) {
-    $policy->policy_number = '';
+    // Generate next policy number
+    $base_policy_number = preg_replace('/\/\d+\/?\d*$/', '', $policy->policy_number); // Remove existing renewal suffix
+    
+    // Find the highest renewal number for this base policy number
+    $existing_renewals = $wpdb->get_col($wpdb->prepare("
+        SELECT policy_number FROM $policies_table 
+        WHERE policy_number LIKE %s
+        ORDER BY policy_number DESC
+    ", $base_policy_number . '/%'));
+    
+    $next_renewal_number = '02'; // Default start
+    if (!empty($existing_renewals)) {
+        foreach ($existing_renewals as $renewal_number) {
+            if (preg_match('/\/(\d+)\/?\d*$/', $renewal_number, $matches)) {
+                $current_renewal = intval($matches[1]);
+                if ($current_renewal >= intval($next_renewal_number)) {
+                    $next_renewal_number = str_pad($current_renewal + 1, 2, '0', STR_PAD_LEFT);
+                }
+            }
+        }
+    }
+    
+    $policy->policy_number = $base_policy_number . '/' . $next_renewal_number . '/00';
     $policy->status = 'aktif';
     $policy->start_date = date('Y-m-d', strtotime($policy->end_date . ' +1 day'));
     $policy->end_date = date('Y-m-d', strtotime($policy->end_date . ' +1 year'));
@@ -283,14 +310,14 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
                         </select>
                     </div>
                     <div class="ab-form-group">
-                        <label for="insurance_company">Sigorta Şirketi *</label>
-                        <select name="insurance_company" id="insurance_company" class="ab-input" required>
-                            <option value="">Seçiniz</option>
-                            <option value="Anadolu Birlik" <?php selected($policy->insurance_company, 'Anadolu Birlik'); ?>>Anadolu Birlik</option>
-                            <option value="Allianz" <?php selected($policy->insurance_company, 'Allianz'); ?>>Allianz</option>
-                            <option value="Axa" <?php selected($policy->insurance_company, 'Axa'); ?>>Axa</option>
-                            <option value="HDI" <?php selected($policy->insurance_company, 'HDI'); ?>>HDI</option>
-                            <option value="Zurich" <?php selected($policy->insurance_company, 'Zurich'); ?>>Zurich</option>
+                        <label for="insurance_company">Sigorta Şirketi <span class="required">*</span></label>
+                        <select name="insurance_company" id="insurance_company" class="ab-select" required>
+                            <option value="">Seçiniz...</option>
+                            <?php foreach ($insurance_companies as $company): ?>
+                            <option value="<?php echo esc_attr($company); ?>" <?php selected($policy->insurance_company, $company); ?>>
+                                <?php echo esc_html($company); ?>
+                            </option>
+                            <?php endforeach; ?>
                             <option value="Diğer" <?php selected($policy->insurance_company, 'Diğer'); ?>>Diğer</option>
                         </select>
                     </div>
@@ -397,57 +424,331 @@ function updateGrossPremiumField() {
     }
 }
 
+// Auto-update end date when start date changes
+function updateEndDate() {
+    const startDateInput = document.getElementById('start_date');
+    const endDateInput = document.getElementById('end_date');
+    
+    if (startDateInput && endDateInput && startDateInput.value) {
+        const startDate = new Date(startDateInput.value);
+        const endDate = new Date(startDate);
+        endDate.setFullYear(endDate.getFullYear() + 1); // Add 1 year
+        
+        // Format date as YYYY-MM-DD
+        const endDateString = endDate.toISOString().split('T')[0];
+        endDateInput.value = endDateString;
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateGrossPremiumField();
+    
+    // Add event listener for start date changes
+    const startDateInput = document.getElementById('start_date');
+    if (startDateInput) {
+        startDateInput.addEventListener('change', updateEndDate);
+    }
 });
 </script>
 
 <style>
+/* Modern Material Design Form Styling - Matching policies-view.php */
+:root {
+    /* Primary Colors */
+    --color-primary: #1976d2;
+    --color-primary-dark: #0d47a1;
+    --color-primary-light: #42a5f5;
+    --color-secondary: #9c27b0;
+    
+    /* Status Colors */
+    --color-success: #2e7d32;
+    --color-success-light: #e8f5e9;
+    --color-warning: #f57c00;
+    --color-warning-light: #fff8e0;
+    --color-danger: #d32f2f;
+    --color-danger-light: #ffebee;
+    --color-info: #0288d1;
+    --color-info-light: #e1f5fe;
+    
+    /* Neutral Colors */
+    --color-text-primary: #212121;
+    --color-text-secondary: #757575;
+    --color-background: #f5f5f5;
+    --color-surface: #ffffff;
+    --color-border: #e0e0e0;
+    
+    /* Typography */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    --shadow-md: 0 3px 6px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.12);
+    --shadow-lg: 0 10px 20px rgba(0,0,0,0.15), 0 3px 6px rgba(0,0,0,0.1);
+    
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+}
+
+/* Base container styling */
+.ab-container {
+    font-family: var(--font-family);
+    color: var(--color-text-primary);
+    background-color: var(--color-background);
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: var(--spacing-md);
+}
+
+/* Header styling */
+.ab-header {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.ab-header-content h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.ab-header-content h1 i {
+    color: var(--color-primary);
+}
+
+.ab-header-content p {
+    margin: var(--spacing-sm) 0 0 0;
+    color: var(--color-text-secondary);
+    font-size: 16px;
+}
+
+/* Form sections */
+.ab-form-section {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--spacing-lg);
+    overflow: hidden;
+}
+
+.ab-form-section h3 {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    color: white;
+    margin: 0;
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.ab-form-section h3 i {
+    font-size: 20px;
+}
+
+/* Form rows and groups */
+.ab-form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+}
+
+.ab-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.ab-form-group.ab-full-width {
+    grid-column: 1 / -1;
+}
+
+.ab-form-group label {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.ab-form-group label .required {
+    color: var(--color-danger);
+}
+
+/* Input styling */
+.ab-input, .ab-select {
+    padding: 12px 16px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 16px;
+    font-family: var(--font-family);
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    transition: all 0.3s ease;
+}
+
+.ab-input:focus, .ab-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.ab-input[readonly] {
+    background: #f8f9fa;
+    color: var(--color-text-secondary);
+    cursor: not-allowed;
+}
+
+/* Button styling */
+.ab-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.ab-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.ab-btn-primary {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    color: white;
+}
+
+.ab-btn-primary:hover {
+    background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
+}
+
+.ab-btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    border: 2px solid var(--color-border);
+}
+
+.ab-btn-secondary:hover {
+    background: var(--color-background);
+    border-color: var(--color-primary);
+}
+
+/* Form actions */
+.ab-form-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: flex-end;
+    padding: var(--spacing-lg);
+    background: var(--color-background);
+    border-top: 1px solid var(--color-border);
+}
+
+/* Family selection styling */
 .family-selection {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 15px;
-    margin-top: 10px;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
 }
 
 .family-member {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 15px;
-    background: #f9f9f9;
+    background: var(--color-surface);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    transition: all 0.3s ease;
 }
 
 .family-member:hover {
-    background: #f0f0f0;
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
 }
 
 .ab-checkbox-label {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+}
+
+.ab-checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin: 0;
     cursor: pointer;
 }
 
 .family-member-info {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--spacing-xs);
 }
 
 .family-member-info strong {
-    font-size: 14px;
-    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text-primary);
 }
 
 .family-member-info small {
-    color: #666;
-    font-size: 12px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
 }
 
-.ab-form-section {
-    background: #fff;
-    border: 1px solid #ddd;
+/* Responsive design */
+@media (max-width: 768px) {
+    .ab-header {
+        flex-direction: column;
+        gap: var(--spacing-md);
+        text-align: center;
+    }
+    
+    .ab-form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .ab-form-actions {
+        flex-direction: column;
+    }
+}
+
+/* Small form help text */
+.ab-form-help {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: var(--spacing-xs);
+}
+</style>
     border-radius: 8px;
     margin-bottom: 20px;
     padding: 20px;
