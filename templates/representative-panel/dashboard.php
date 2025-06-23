@@ -1298,7 +1298,11 @@ if ($current_view == 'search' && isset($_GET['keyword']) && !empty(trim($_GET['k
     if (!empty($rep_ids)) {
         $placeholders = implode(',', array_fill(0, count($rep_ids), '%d'));
         $search_query = "
-            SELECT c.*, p.policy_number, CONCAT(TRIM(c.first_name), ' ', TRIM(c.last_name)) AS customer_name
+            SELECT c.*, p.policy_number, 
+                   CASE 
+                       WHEN TRIM(COALESCE(c.company_name, '')) != '' THEN CONCAT(TRIM(c.company_name), CASE WHEN TRIM(COALESCE(c.tax_number, '')) != '' THEN CONCAT(' - VKN: ', TRIM(c.tax_number)) ELSE '' END)
+                       ELSE CONCAT(TRIM(c.first_name), ' ', TRIM(c.last_name))
+                   END AS customer_name
             FROM {$wpdb->prefix}insurance_crm_customers c
             LEFT JOIN {$wpdb->prefix}insurance_crm_policies p ON c.id = p.customer_id
             WHERE c.representative_id IN ($placeholders)

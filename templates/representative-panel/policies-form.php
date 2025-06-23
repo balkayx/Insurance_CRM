@@ -2194,6 +2194,18 @@ function setupInteractiveFlow() {
         // Sigortalı soru bölümünü göster
         insuredQuestion.style.display = 'block';
         
+        // Sigortalı soru bölümüne odaklan
+        setTimeout(() => {
+            const insuredQuestionElement = document.getElementById('insured_question');
+            if (insuredQuestionElement) {
+                insuredQuestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const firstRadio = insuredQuestionElement.querySelector('input[name="same_as_insured"]');
+                if (firstRadio) {
+                    firstRadio.focus();
+                }
+            }
+        }, 300);
+        
         // Varsayılan "Evet" seçili olduğu için poliçe detaylarını da göster
         const defaultRadio = document.querySelector('input[name="same_as_insured"][value="yes"]');
         if (defaultRadio && defaultRadio.checked) {

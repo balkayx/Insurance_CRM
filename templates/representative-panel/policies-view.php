@@ -418,13 +418,6 @@ if ($is_cancelled) {
                         </div>
                         <?php endif; ?>
                         
-                        <?php if (!empty($policy->insured_party)): ?>
-                        <div class="info-item">
-                            <div class="item-label">Sigortalayan</div>
-                            <div class="item-value highlight"><?php echo esc_html($policy->insured_party); ?></div>
-                        </div>
-                        <?php endif; ?>
-                        
                         <?php if (!empty($policy->plate_number)): ?>
                         <div class="info-item">
                             <div class="item-label">Araç Plakası</div>
