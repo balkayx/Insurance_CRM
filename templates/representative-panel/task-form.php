@@ -604,10 +604,7 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
                                 <!-- Customer Search -->
                                 <div class="customer-search-container">
                                     <input type="text" id="customer_search" class="form-input" 
-                                           placeholder="Müşteri adı, TC kimlik no, telefon ile arama...">
-                                    <button type="button" id="search_customer_btn" class="btn btn-primary">
-                                        <i class="fas fa-search"></i> Ara
-                                    </button>
+                                           placeholder="Müşteri adı, TC kimlik no, telefon ile arama..." autocomplete="off">
                                 </div>
                                 
                                 <!-- Search Results -->
@@ -977,13 +974,22 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
 }
 
 .customer-search-container {
-    display: flex;
-    gap: var(--spacing-sm);
     margin-bottom: var(--spacing-md);
 }
 
 .customer-search-container input {
-    flex: 1;
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--outline-variant);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.customer-search-container input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+    outline: none;
 }
 
 /* Search Results Enhancement */
@@ -1490,7 +1496,6 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
 document.addEventListener('DOMContentLoaded', function() {
     // DOM elementleri
     const customerSearchInput = document.getElementById('customer_search');
-    const searchCustomerBtn = document.getElementById('search_customer_btn');
     const customerSearchResults = document.getElementById('customer_search_results');
     const selectedCustomerDisplay = document.getElementById('selected_customer_display');
     const selectedCustomerId = document.getElementById('selected_customer_id');
@@ -1518,8 +1523,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Enhanced customer search functionality - More responsive like policies-form.php
-    if (searchCustomerBtn && customerSearchInput) {
+    // Enhanced interactive customer search functionality
+    if (customerSearchInput) {
         // Live search on input with improved debouncing
         let searchTimeout;
         customerSearchInput.addEventListener('input', function() {
@@ -1540,7 +1545,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300); // Debounce for 300ms
         });
         
-        searchCustomerBtn.addEventListener('click', performCustomerSearch);
+        // Auto-trigger search on Enter key
         customerSearchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();

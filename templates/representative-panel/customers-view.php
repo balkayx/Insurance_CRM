@@ -277,7 +277,7 @@ $base_query = "
     WHERE c.id = %d{$where_clause}
 ";
 
-$customer = $wpdb->get_row($wpdb->prepare($base_query, $where_params));
+$customer = $wpdb->get_row($wpdb->prepare($base_query, ...$where_params));
 
 if (!$customer) {
     echo '<div class="ab-notice ab-error">Müşteri bulunamadı veya görüntüleme yetkiniz yok.</div>';
@@ -559,94 +559,7 @@ function can_edit_customer_view($customer) {
     return false;
 }
 
-/**
- * Müşteri dosyalarını yükler
- */
-function handle_customer_file_uploads($customer_id) {
-    global $wpdb;
-    $files_table = $wpdb->prefix . 'insurance_crm_customer_files';
-    $upload_dir = wp_upload_dir();
-    $customer_dir = $upload_dir['basedir'] . '/customer_files/' . $customer_id;
-    
-    // Klasör yoksa oluştur
-    if (!file_exists($customer_dir)) {
-        wp_mkdir_p($customer_dir);
-    }
-    
-    // Admin panelinden izin verilen dosya türlerini al
-    $settings = get_option('insurance_crm_settings', array());
-    $allowed_types = !empty($settings['file_upload_settings']['allowed_file_types']) 
-        ? $settings['file_upload_settings']['allowed_file_types'] 
-        : array('jpg', 'jpeg', 'pdf', 'docx'); // Varsayılan türler
-
-    $max_file_size = 5 * 1024 * 1024; // 5MB
-    $max_file_count = 5; // Maksimum dosya sayısı
-    
-    $file_count = count($_FILES['customer_files']['name']);
-    
-    // Dosya sayısını kontrol et
-    if ($file_count > $max_file_count) {
-        $_SESSION['crm_notice'] = '<div class="ab-notice ab-error">En fazla ' . $max_file_count . ' dosya yükleyebilirsiniz.</div>';
-        return false;
-    }
-    
-    $upload_count = 0;
-    $success = false;
-    
-    for ($i = 0; $i < $file_count; $i++) {
-        if ($_FILES['customer_files']['error'][$i] !== UPLOAD_ERR_OK) {
-            continue;
-        }
-        
-        $file_name = sanitize_file_name($_FILES['customer_files']['name'][$i]);
-        $file_tmp = $_FILES['customer_files']['tmp_name'][$i];
-        $file_size = $_FILES['customer_files']['size'][$i];
-        $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-        $file_description = isset($_POST['file_descriptions'][$i]) ? sanitize_text_field($_POST['file_descriptions'][$i]) : '';
-        
-        // Dosya türü ve boyutu kontrolü
-        if (!in_array($file_ext, $allowed_types)) {
-            continue;
-        }
-        
-        if ($file_size > $max_file_size) {
-            continue;
-        }
-        
-        // Upload sayısını kontrol et
-        if ($upload_count >= $max_file_count) {
-            $_SESSION['crm_notice'] = '<div class="ab-notice ab-warning">Maksimum ' . $max_file_count . ' dosya sınırına ulaşıldı. Diğer dosyalar yüklenmedi.</div>';
-            break;
-        }
-        
-        // Benzersiz dosya adı oluştur
-        $new_file_name = time() . '-' . $file_name;
-        $file_path = $customer_dir . '/' . $new_file_name;
-        $file_url = $upload_dir['baseurl'] . '/customer_files/' . $customer_id . '/' . $new_file_name;
-        
-        // Dosyayı taşı
-        if (move_uploaded_file($file_tmp, $file_path)) {
-            // Dosya bilgilerini veritabanına kaydet
-            $wpdb->insert(
-                $files_table,
-                array(
-                    'customer_id' => $customer_id,
-                    'file_name' => $file_name,
-                    'file_path' => $file_url,
-                    'file_type' => $file_ext,
-                    'file_size' => $file_size,
-                    'upload_date' => current_time('mysql'),
-                    'description' => $file_description
-                )
-            );
-            
-            $upload_count++;
-            $success = true;
-        }
-    }
-    
-    return $success;
-}
+// Note: handle_customer_file_uploads function is defined in customers-form.php to avoid redeclaration
 
 /**
  * Müşteri dosyasını siler

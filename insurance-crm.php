@@ -1677,16 +1677,58 @@ function insurance_crm_toggle_offer_status() {
         wp_send_json_error('Security check failed');
     }
     
-    // Check user permissions
-    if (!current_user_can('edit_posts')) {
-        wp_send_json_error('Insufficient permissions');
-    }
-    
     global $wpdb;
     $customers_table = $wpdb->prefix . 'insurance_crm_customers';
+    $reps_table = $wpdb->prefix . 'insurance_crm_representatives';
+    $current_user_id = get_current_user_id();
     
     $customer_id = intval($_POST['customer_id']);
     $has_offer = intval($_POST['has_offer']);
+    
+    // Get customer data to check permissions
+    $customer = $wpdb->get_row($wpdb->prepare("SELECT * FROM $customers_table WHERE id = %d", $customer_id));
+    
+    if (!$customer) {
+        wp_send_json_error('Müşteri bulunamadı');
+    }
+    
+    // Check permissions using the same function as the view
+    // Administrator always has permission
+    $can_edit = false;
+    if (current_user_can('administrator')) {
+        $can_edit = true;
+    } else {
+        // Get representative data
+        $rep_data = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $reps_table WHERE user_id = %d",
+            $current_user_id
+        ));
+        
+        if ($rep_data) {
+            // Role-based permission check
+            if ($rep_data->role == 1) { // Patron
+                $can_edit = true;
+            } elseif ($rep_data->role == 2 && $rep_data->customer_edit == 1) { // Müdür with edit permission
+                $can_edit = true;
+            } elseif ($rep_data->role == 3 && $rep_data->customer_edit == 1) { // Müdür Yardımcısı with edit permission
+                $can_edit = true;
+            } elseif ($rep_data->role == 4 && $rep_data->customer_edit == 1) { // Ekip Lideri with edit permission
+                // Team leader can only edit their team's customers
+                if (function_exists('get_team_members')) {
+                    $members = get_team_members($current_user_id);
+                    $can_edit = in_array($customer->representative_id, $members);
+                } else {
+                    $can_edit = ($customer->representative_id == $rep_data->id);
+                }
+            } elseif ($rep_data->role == 5 && $rep_data->customer_edit == 1) { // Temsilci with edit permission
+                $can_edit = ($customer->representative_id == $rep_data->id);
+            }
+        }
+    }
+    
+    if (!$can_edit) {
+        wp_send_json_error('Bu müşteriyi düzenleme yetkiniz yok');
+    }
     
     $update_data = array('has_offer' => $has_offer);
     
