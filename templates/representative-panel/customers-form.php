@@ -768,42 +768,7 @@ function handle_customer_file_uploads($customer_id) {
     }
 }
 
-// Note: delete_customer_file function is defined in customers-view.php to avoid redeclaration
-
-// Dosya türüne göre ikon belirleme
-function get_file_icon($file_type) {
-    switch ($file_type) {
-        case 'pdf':
-            return 'fa-file-pdf';
-        case 'docx':
-        case 'doc':
-            return 'fa-file-word';
-        case 'jpg':
-        case 'jpeg':
-        case 'png':
-            return 'fa-file-image';
-        case 'xls':
-        case 'xlsx':
-            return 'fa-file-excel';
-        case 'zip':
-            return 'fa-file-archive';
-        case 'txt':
-            return 'fa-file-alt';
-        default:
-            return 'fa-file';
-    }
-}
-
-// Dosya boyutu formatını düzenleme
-function format_file_size($size) {
-    if ($size < 1024) {
-        return $size . ' B';
-    } elseif ($size < 1048576) {
-        return round($size / 1024, 2) . ' KB';
-    } else {
-        return round($size / 1048576, 2) . ' MB';
-    }
-}
+// Note: Helper functions (get_file_icon, format_file_size, delete_customer_file) are defined in customers-view.php to avoid redeclaration
 
 // İzin verilen dosya tiplerini alma ve formatı düzenleme
 function get_allowed_file_types_text() {
