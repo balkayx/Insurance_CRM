@@ -986,6 +986,7 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
     flex: 1;
 }
 
+/* Search Results Enhancement */
 .search-results {
     background: var(--surface);
     border: 1px solid var(--outline-variant);
@@ -994,6 +995,20 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
     max-height: 300px;
     overflow-y: auto;
     margin-bottom: var(--spacing-md);
+    z-index: 1000;
+}
+
+.search-no-results,
+.search-error {
+    padding: var(--spacing-md);
+    text-align: center;
+    color: var(--on-surface-variant);
+    font-style: italic;
+}
+
+.search-error {
+    color: var(--danger);
+    background: rgba(244, 67, 54, 0.1);
 }
 
 .search-result-item {
@@ -1503,9 +1518,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Customer search functionality - More responsive like policies-form.php
+    // Enhanced customer search functionality - More responsive like policies-form.php
     if (searchCustomerBtn && customerSearchInput) {
-        // Live search on input
+        // Live search on input with improved debouncing
         let searchTimeout;
         customerSearchInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
@@ -1515,6 +1530,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 customerSearchResults.style.display = 'none';
                 return;
             }
+            
+            // Show loading immediately for better UX
+            customerSearchResults.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><span>Aranıyor...</span></div>';
+            customerSearchResults.style.display = 'block';
             
             searchTimeout = setTimeout(() => {
                 performCustomerSearch();
@@ -1533,6 +1552,13 @@ document.addEventListener('DOMContentLoaded', function() {
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.customer-search-section')) {
                 customerSearchResults.style.display = 'none';
+            }
+        });
+        
+        // Focus enhancement
+        customerSearchInput.addEventListener('focus', function() {
+            if (this.value.trim().length >= 2) {
+                customerSearchResults.style.display = 'block';
             }
         });
     }
@@ -1554,21 +1580,29 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('search_term', searchTerm);
         formData.append('nonce', '<?php echo wp_create_nonce("customer_search"); ?>');
         
+        // Enhanced debugging
+        console.log('Searching for customers with term:', searchTerm);
+        
         fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('Search response:', data);
             if (data.success) {
                 displaySearchResults(data.data);
             } else {
-                customerSearchResults.innerHTML = '<div class="search-no-results">Müşteri bulunamadı.</div>';
+                console.error('Search failed:', data.data);
+                customerSearchResults.innerHTML = '<div class="search-no-results">Müşteri bulunamadı: ' + (data.data || 'Bilinmeyen hata') + '</div>';
             }
         })
         .catch(error => {
             console.error('Search error:', error);
-            customerSearchResults.innerHTML = '<div class="search-error">Arama sırasında hata oluştu.</div>';
+            customerSearchResults.innerHTML = '<div class="search-error">Arama sırasında hata oluştu: ' + error.message + '</div>';
         });
     }
     
@@ -1584,8 +1618,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const tcVkn = customer.tax_number || customer.tc_identity || 'Belirtilmemiş';
             const phone = customer.phone || 'Belirtilmemiş';
             
+            // Escape quotes to prevent JavaScript errors
+            const safeDisplayName = displayName.replace(/'/g, "\\'").replace(/"/g, '\\"');
+            const safeTcVkn = tcVkn.replace(/'/g, "\\'").replace(/"/g, '\\"');
+            const safePhone = phone.replace(/'/g, "\\'").replace(/"/g, '\\"');
+            const safeCompanyName = (customer.company_name || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
+            
             html += `
-                <div class="search-result-item" onclick="selectCustomer(${customer.id}, '${displayName}', '${tcVkn}', '${phone}', '${customer.company_name || ''}')">
+                <div class="search-result-item" onclick="selectCustomer(${customer.id}, '${safeDisplayName}', '${safeTcVkn}', '${safePhone}', '${safeCompanyName}')">
                     <div class="search-result-avatar">
                         <i class="fas fa-${customer.company_name ? 'building' : 'user'}"></i>
                     </div>
@@ -1603,21 +1643,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     window.selectCustomer = function(customerId, displayName, tcVkn, phone, companyName) {
-        const customerData = {
-            id: customerId,
-            name: displayName,
-            tc_vkn: tcVkn,
-            phone: phone,
-            is_company: !!companyName
-        };
+        console.log('Selecting customer:', customerId, displayName);
         
-        selectedCustomerId.value = customerId;
-        displaySelectedCustomer(customerData);
-        customerSearchResults.style.display = 'none';
-        customerSearchInput.value = '';
-        
-        // Load customer policies
-        loadCustomerPolicies(customerId);
+        try {
+            const customerData = {
+                id: customerId,
+                name: displayName,
+                tc_vkn: tcVkn,
+                phone: phone,
+                is_company: !!companyName
+            };
+            
+            selectedCustomerId.value = customerId;
+            displaySelectedCustomer(customerData);
+            customerSearchResults.style.display = 'none';
+            customerSearchInput.value = '';
+            
+            // Load customer policies
+            loadCustomerPolicies(customerId);
+        } catch (error) {
+            console.error('Error selecting customer:', error);
+            alert('Müşteri seçiminde hata oluştu: ' + error.message);
+        }
     };
     
     function displaySelectedCustomer(customerData) {

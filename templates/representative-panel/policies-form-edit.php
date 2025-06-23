@@ -134,9 +134,14 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
         }
     }
     
-    if ($editing) {
+    if ($editing || $cancelling) {
+        // Both editing and cancelling are UPDATE operations
         $result = $wpdb->update($policies_table, $policy_data, array('id' => $policy_id));
-        $message = 'Poliçe başarıyla güncellendi.';
+        if ($cancelling) {
+            $message = 'Poliçe başarıyla iptal edildi.';
+        } else {
+            $message = 'Poliçe başarıyla güncellendi.';
+        }
         $redirect_url = '?view=policies&action=view&id=' . $policy_id;
     } else { // renewing
         // Remove ID-related fields for renewal

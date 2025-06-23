@@ -1729,6 +1729,11 @@ function insurance_crm_search_customers_for_task() {
     
     $search_term = sanitize_text_field($_POST['search_term']);
     
+    // Check if search term is provided
+    if (empty($search_term)) {
+        wp_send_json_error('Search term is required');
+    }
+    
     // Build search query
     $search_query = "
         SELECT id, first_name, last_name, tc_identity, tax_number, phone, company_name
@@ -1758,6 +1763,12 @@ function insurance_crm_search_customers_for_task() {
         $search_param,
         $search_param
     ));
+    
+    // Check for database errors
+    if ($wpdb->last_error) {
+        error_log('Customer search database error: ' . $wpdb->last_error);
+        wp_send_json_error('Database error occurred');
+    }
     
     if ($customers) {
         wp_send_json_success($customers);
