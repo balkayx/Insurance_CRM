@@ -1546,9 +1546,23 @@ function insurance_crm_fix_all_names() {
         wp_send_json_error('Security check failed');
     }
     
-    // Check user permissions
-    if (!current_user_can('edit_posts')) {
+    // Check user permissions - Only Patron and Müdür roles
+    $current_user = wp_get_current_user();
+    if (!in_array('insurance_representative', (array)$current_user->roles)) {
         wp_send_json_error('Insufficient permissions');
+    }
+    
+    // Get representative info and check role
+    global $wpdb;
+    $reps_table = $wpdb->prefix . 'insurance_crm_reps';
+    $current_rep = $wpdb->get_row($wpdb->prepare(
+        "SELECT role FROM $reps_table WHERE user_id = %d", 
+        $current_user->ID
+    ));
+    
+    // Only Patron (role 1) and Müdür (role 2) can fix names
+    if (!$current_rep || !in_array($current_rep->role, [1, 2])) {
+        wp_send_json_error('Bu işlem için Patron veya Müdür yetkisi gereklidir.');
     }
     
     global $wpdb;

@@ -1503,13 +1503,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Customer search functionality
+    // Customer search functionality - More responsive like policies-form.php
     if (searchCustomerBtn && customerSearchInput) {
+        // Live search on input
+        let searchTimeout;
+        customerSearchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const searchTerm = this.value.trim();
+            
+            if (searchTerm.length < 2) {
+                customerSearchResults.style.display = 'none';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                performCustomerSearch();
+            }, 300); // Debounce for 300ms
+        });
+        
         searchCustomerBtn.addEventListener('click', performCustomerSearch);
         customerSearchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 performCustomerSearch();
+            }
+        });
+        
+        // Hide results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.customer-search-section')) {
+                customerSearchResults.style.display = 'none';
             }
         });
     }

@@ -26,6 +26,25 @@ $payment_options = $settings['payment_options'] ?? ['Peşin', '3 Taksit', '6 Tak
 // Cancellation reasons
 $cancellation_reasons = ['Araç Satışı', 'İsteğe Bağlı', 'Tahsilattan İptal', 'Diğer Sebepler'];
 
+// Ensure cancellation columns exist
+$cancellation_columns = ['cancellation_reason', 'cancellation_date', 'refund_amount'];
+foreach ($cancellation_columns as $column) {
+    $column_exists = $wpdb->get_row("SHOW COLUMNS FROM $policies_table LIKE '$column'");
+    if (!$column_exists) {
+        switch ($column) {
+            case 'cancellation_reason':
+                $wpdb->query("ALTER TABLE $policies_table ADD COLUMN cancellation_reason VARCHAR(100) DEFAULT NULL");
+                break;
+            case 'cancellation_date':
+                $wpdb->query("ALTER TABLE $policies_table ADD COLUMN cancellation_date DATE DEFAULT NULL");
+                break;
+            case 'refund_amount':
+                $wpdb->query("ALTER TABLE $policies_table ADD COLUMN refund_amount DECIMAL(10,2) DEFAULT NULL");
+                break;
+        }
+    }
+}
+
 // Ensure gross_premium column exists
 $gross_premium_exists = $wpdb->get_row("SHOW COLUMNS FROM $policies_table LIKE 'gross_premium'");
 if (!$gross_premium_exists) {
@@ -272,6 +291,46 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
                 </div>
             </div>
 
+            <!-- Cancellation Details - Only show when cancelling -->
+            <?php if ($cancelling): ?>
+            <div class="ab-form-section ab-form-section-warning">
+                <h3><i class="fas fa-exclamation-triangle"></i> İptal Bilgileri</h3>
+                <div class="ab-form-warning">
+                    <div class="ab-warning-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="ab-warning-content">
+                        <strong>Dikkat:</strong> İptal işlemi geri alınamaz. İptal edilen poliçeler sistemde kalacak ancak Zeyil olarak işaretlenecektir.
+                    </div>
+                </div>
+                <div class="ab-form-row">
+                    <div class="ab-form-group">
+                        <label for="cancellation_date">İptal Tarihi *</label>
+                        <input type="date" name="cancellation_date" id="cancellation_date" class="ab-input" 
+                               value="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
+                    <div class="ab-form-group">
+                        <label for="cancellation_reason">İptal Nedeni *</label>
+                        <select name="cancellation_reason" id="cancellation_reason" class="ab-input" required>
+                            <option value="">Seçiniz...</option>
+                            <option value="Araç Satışı">Araç Satışı</option>
+                            <option value="İsteğe Bağlı">İsteğe Bağlı</option>
+                            <option value="Tahsilattan İptal">Tahsilattan İptal</option>
+                            <option value="Diğer Nedenler">Diğer Nedenler</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="ab-form-row">
+                    <div class="ab-form-group">
+                        <label for="refund_amount">İade Tutarı (₺)</label>
+                        <input type="number" name="refund_amount" id="refund_amount" class="ab-input" 
+                               step="0.01" min="0" placeholder="Varsa iade tutarını giriniz">
+                        <small class="ab-form-help">İade edilecek tutar varsa giriniz. Boş bırakılabilir.</small>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Insured Persons Selection -->
             <div class="ab-form-section">
                 <h3><i class="fas fa-users"></i> Sigortalı Seçimi</h3>
@@ -370,47 +429,6 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
                         </select>
                     </div>
                 </div>
-            </div>
-
-            <!-- Cancellation Details - Only show when cancelling -->
-            <?php if ($cancelling): ?>
-            <div class="ab-form-section ab-form-section-warning">
-                <h3><i class="fas fa-exclamation-triangle"></i> İptal Bilgileri</h3>
-                <div class="ab-form-warning">
-                    <div class="ab-warning-icon">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <div class="ab-warning-content">
-                        <strong>Dikkat:</strong> İptal işlemi geri alınamaz. İptal edilen poliçeler sistemde kalacak ancak Zeyil olarak işaretlenecektir.
-                    </div>
-                </div>
-                <div class="ab-form-row">
-                    <div class="ab-form-group">
-                        <label for="cancellation_date">İptal Tarihi *</label>
-                        <input type="date" name="cancellation_date" id="cancellation_date" class="ab-input" 
-                               value="<?php echo date('Y-m-d'); ?>" required>
-                    </div>
-                    <div class="ab-form-group">
-                        <label for="cancellation_reason">İptal Nedeni *</label>
-                        <select name="cancellation_reason" id="cancellation_reason" class="ab-input" required>
-                            <option value="">Seçiniz...</option>
-                            <option value="Araç Satışı">Araç Satışı</option>
-                            <option value="İsteğe Bağlı">İsteğe Bağlı</option>
-                            <option value="Tahsilattan İptal">Tahsilattan İptal</option>
-                            <option value="Diğer Nedenler">Diğer Nedenler</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="ab-form-row">
-                    <div class="ab-form-group">
-                        <label for="refund_amount">İade Tutarı (₺)</label>
-                        <input type="number" name="refund_amount" id="refund_amount" class="ab-input" 
-                               step="0.01" min="0" placeholder="Varsa iade tutarını giriniz">
-                        <small class="ab-form-help">İade edilecek tutar varsa giriniz. Boş bırakılabilir.</small>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
             </div>
 
             <!-- Payment Information -->

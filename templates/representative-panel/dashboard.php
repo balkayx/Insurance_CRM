@@ -8195,20 +8195,36 @@ $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $setting
                 }
                 
                 /* Search Results Table Styling */
-                .search-results-table .odd-row {
-                    background-color: #f8f9fa;
+                .search-results-table tr.odd-row {
+                    background-color: #f8f9fa !important;
                 }
                 
-                .search-results-table .even-row {
-                    background-color: #ffffff;
+                .search-results-table tr.even-row {
+                    background-color: #ffffff !important;
                 }
                 
-                .search-results-table .odd-row:hover {
-                    background-color: #e9ecef;
+                .search-results-table tr.odd-row:hover {
+                    background-color: #e9ecef !important;
                 }
                 
-                .search-results-table .even-row:hover {
-                    background-color: #f1f3f4;
+                .search-results-table tr.even-row:hover {
+                    background-color: #f1f3f4 !important;
+                }
+                
+                .search-results-table tbody tr:nth-child(odd) {
+                    background-color: #f8f9fa !important;
+                }
+                
+                .search-results-table tbody tr:nth-child(even) {
+                    background-color: #ffffff !important;
+                }
+                
+                .search-results-table tbody tr:nth-child(odd):hover {
+                    background-color: #e9ecef !important;
+                }
+                
+                .search-results-table tbody tr:nth-child(even):hover {
+                    background-color: #f1f3f4 !important;
                 }
                 
                 .search-results-table .corporate-customer {
