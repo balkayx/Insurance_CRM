@@ -2246,6 +2246,23 @@ function has_full_admin_access($user_id) {
  */
 add_action('wp_ajax_toggle_representative_status', 'handle_toggle_representative_status');
 
+// Policy prompt dismiss handler
+add_action('wp_ajax_dismiss_policy_prompt', 'handle_dismiss_policy_prompt');
+
+function handle_dismiss_policy_prompt() {
+    // Check nonce for security
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'dismiss_policy_prompt')) {
+        wp_die('Security check failed');
+    }
+    
+    // Clear session variables
+    unset($_SESSION['show_policy_prompt']);
+    unset($_SESSION['new_customer_id']);
+    unset($_SESSION['new_customer_name']);
+    
+    wp_send_json_success('Policy prompt dismissed');
+}
+
 function handle_toggle_representative_status() {
     check_ajax_referer('insurance_crm_ajax', '_wpnonce');
     

@@ -1853,7 +1853,22 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (isEditMode || isCancelMode) {
         console.log('✏️ Düzenleme/İptal modunda - Tüm bölümler gösteriliyor');
+        
+        // Önce UI elementlerini göster
+        const selectedCustomerDetails = document.getElementById('selected_customer_details');
+        const insuredQuestion = document.getElementById('insured_question');
+        if (selectedCustomerDetails) selectedCustomerDetails.style.display = 'block';
+        if (insuredQuestion) insuredQuestion.style.display = 'block';
+        
+        // Poliçe detaylarını zorla göster
         showPolicyDetailsSteps();
+        
+        // Ek güvenlik için setTimeout ile tekrar çalıştır
+        setTimeout(() => {
+            showPolicyDetailsSteps();
+            console.log('🔄 Düzenleme modunda poliçe detayları tekrar gösterildi');
+        }, 100);
+        
         setupExistingFunctionality();
         
         // Müşteri bilgilerini ve aile üyelerini otomatik yükle
@@ -1868,12 +1883,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Yenileme modunda da poliçe detaylarını göster
     if (isRenewMode) {
         console.log('🔄 Yenileme modunda - Müşteri seçili, poliçe detayları gösteriliyor');
+        
         // Müşteri bilgileri zaten seçili
         if (selectedCustomerDetails) selectedCustomerDetails.style.display = 'block';
         if (insuredQuestion) insuredQuestion.style.display = 'block';
         
-        // Poliçe detaylarını otomatik göster
+        // Poliçe detaylarını otomatik göster - zorla
         showPolicyDetailsSteps();
+        
+        // Ek güvenlik için setTimeout ile tekrar çalıştır
+        setTimeout(() => {
+            showPolicyDetailsSteps();
+            console.log('🔄 Yenileme modunda poliçe detayları tekrar gösterildi');
+        }, 100);
         
         // Etkileşimli akış ve mevcut işlevsellik
         setupInteractiveFlow();
@@ -2674,14 +2696,23 @@ function showPolicyDetailsSteps() {
     const policySteps = document.querySelectorAll('.policy-details-step');
     const submitButton = document.getElementById('submit_button');
     
-    policySteps.forEach(el => {
+    console.log('🔍 Bulunan policy-details-step sayısı:', policySteps.length);
+    
+    policySteps.forEach((el, index) => {
+        console.log(`📋 Step ${index + 1} gösteriliyor:`, el);
         el.classList.add('active');
         el.style.display = 'block';
+        el.style.visibility = 'visible';
+        el.style.opacity = '1';
     });
     
     if (submitButton) {
         submitButton.style.display = 'inline-flex';
+        console.log('✅ Submit butonu gösterildi');
     }
+    
+    // Brüt prim alanını kontrol et ve göster (edit/renewal modunda)
+    updateGrossPremiumField();
     
     // Sayfayı poliçe detaylarına yumuşak geçiş yap
     setTimeout(() => {
@@ -2693,6 +2724,8 @@ function showPolicyDetailsSteps() {
             });
         }
     }, 300);
+    
+    console.log('✅ Poliçe detayları bölümleri başarıyla gösterildi');
 }
 
 function setupExistingFunctionality() {

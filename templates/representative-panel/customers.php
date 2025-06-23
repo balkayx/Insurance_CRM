@@ -282,6 +282,7 @@ $offset = ($current_page - 1) * $per_page;
 
 // FİLTRELEME PARAMETRELERİ - Düzeltilmiş
 $search = isset($_GET['customer_name']) ? sanitize_text_field($_GET['customer_name']) : '';
+$quick_search = isset($_GET['quick_search']) ? sanitize_text_field($_GET['quick_search']) : '';
 $status_filter = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
 $category_filter = isset($_GET['category']) ? sanitize_text_field($_GET['category']) : '';
 $representative_filter = isset($_GET['rep_id']) ? intval($_GET['rep_id']) : 0;
@@ -356,6 +357,26 @@ if (!empty($search)) {
         '%' . $wpdb->esc_like($search) . '%',
         '%' . $wpdb->esc_like($search) . '%',
         '%' . $wpdb->esc_like($search) . '%'
+    );
+}
+
+// Hızlı arama filtresi - Ad, Soyad, Firma Adı, TC, VKN ile arama
+if (!empty($quick_search)) {
+    $base_query .= $wpdb->prepare(
+        " AND (
+            c.first_name LIKE %s 
+            OR c.last_name LIKE %s 
+            OR CONCAT(c.first_name, ' ', c.last_name) LIKE %s
+            OR TRIM(COALESCE(c.company_name, '')) LIKE %s
+            OR TRIM(COALESCE(c.tc_identity, '')) LIKE %s
+            OR TRIM(COALESCE(c.tax_number, '')) LIKE %s
+        )",
+        '%' . $wpdb->esc_like($quick_search) . '%',
+        '%' . $wpdb->esc_like($quick_search) . '%',
+        '%' . $wpdb->esc_like($quick_search) . '%',
+        '%' . $wpdb->esc_like($quick_search) . '%',
+        '%' . $wpdb->esc_like($quick_search) . '%',
+        '%' . $wpdb->esc_like($quick_search) . '%'
     );
 }
 
@@ -611,6 +632,7 @@ $show_list = ($current_action !== 'view' && $current_action !== 'edit' && $curre
 
 // Filtreleme yapıldı mı kontrolü
 $is_filtered = !empty($search) || 
+               !empty($quick_search) ||
                !empty($status_filter) || 
                !empty($category_filter) || 
                $representative_filter > 0 || 
@@ -630,6 +652,7 @@ $is_filtered = !empty($search) ||
 // Aktif filtre sayısını hesapla
 $active_filter_count = 0;
 if (!empty($search)) $active_filter_count++;
+if (!empty($quick_search)) $active_filter_count++;
 if (!empty($status_filter)) $active_filter_count++;
 if (!empty($category_filter)) $active_filter_count++;
 if ($representative_filter > 0) $active_filter_count++;
@@ -775,6 +798,27 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
             </div>
         </div>
     </header>
+
+    <!-- Quick Search Section -->
+    <section class="quick-search-section">
+        <div class="quick-search-container">
+            <form method="get" class="quick-search-form">
+                <input type="hidden" name="view" value="<?php echo esc_attr($view_type); ?>">
+                <div class="search-input-group">
+                    <input type="text" 
+                           name="quick_search" 
+                           id="quick_search" 
+                           value="<?php echo isset($_GET['quick_search']) ? esc_attr($_GET['quick_search']) : ''; ?>"
+                           placeholder="Ad Soyad, Firma Adı, TC No, VKN ile hızlı arama..."
+                           class="quick-search-input">
+                    <button type="submit" class="quick-search-btn">
+                        <i class="fas fa-search"></i>
+                        <span>ARA</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
 
     <!-- Filters Section -->
     <section class="filters-section <?php echo $active_filter_count === 0 ? 'hidden' : ''; ?>" id="filtersSection">
@@ -1867,6 +1911,89 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
     border: 1px solid var(--outline-variant);
 }
 
+/* Quick Search Styles */
+.quick-search-section {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--outline-variant);
+}
+
+.quick-search-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.quick-search-form {
+    width: 100%;
+}
+
+.search-input-group {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.quick-search-input {
+    flex: 1;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 2px solid var(--outline);
+    border-right: none;
+    border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+    font-size: var(--text-md);
+    background: var(--surface);
+    color: var(--on-surface);
+    outline: none;
+    transition: all var(--transition-base);
+}
+
+.quick-search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
+}
+
+.quick-search-input::placeholder {
+    color: var(--on-surface-variant);
+    opacity: 0.7;
+}
+
+.quick-search-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-xl);
+    background: var(--primary);
+    color: var(--on-primary);
+    border: 2px solid var(--primary);
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+    font-weight: 600;
+    font-size: var(--text-md);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.quick-search-btn:hover {
+    background: var(--primary-variant);
+    border-color: var(--primary-variant);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.quick-search-btn:active {
+    transform: translateY(0);
+}
+
+.quick-search-btn i {
+    font-size: 1.1em;
+}
+
 .header-content {
     display: flex;
     justify-content: space-between;
@@ -2768,6 +2895,31 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
     .header-content {
         flex-direction: column;
         align-items: stretch;
+    }
+    
+    .quick-search-section {
+        padding: var(--spacing-md);
+    }
+    
+    .search-input-group {
+        flex-direction: column;
+        border-radius: var(--radius-lg);
+    }
+    
+    .quick-search-input,
+    .quick-search-btn {
+        border-radius: var(--radius-lg);
+        border: 2px solid var(--outline);
+    }
+    
+    .quick-search-input {
+        margin-bottom: var(--spacing-sm);
+        border-bottom: 2px solid var(--outline);
+    }
+    
+    .quick-search-btn {
+        justify-content: center;
+        padding: var(--spacing-md);
     }
 
     .header-actions {

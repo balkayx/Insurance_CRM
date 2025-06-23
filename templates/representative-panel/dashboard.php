@@ -4400,10 +4400,17 @@ include_once __DIR__ . '/loader.php';
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($search_results as $customer): ?>
-                                        <tr>
+                                    <?php 
+                                    $row_count = 0;
+                                    foreach ($search_results as $customer): 
+                                        $row_count++;
+                                        $is_corporate = !empty(trim($customer->company_name ?? ''));
+                                        $row_class = ($row_count % 2 == 0) ? 'even-row' : 'odd-row';
+                                    ?>
+                                        <tr class="<?php echo $row_class; ?>">
                                             <td>
-                                                <a href="?view=customers&action=view&id=<?php echo esc_attr($customer->id); ?>" class="ab-customer-name">
+                                                <a href="?view=customers&action=view&id=<?php echo esc_attr($customer->id); ?>" 
+                                                   class="ab-customer-name <?php echo $is_corporate ? 'corporate-customer' : ''; ?>">
                                                     <?php echo esc_html($customer->customer_name); ?>
                                                 </a>
                                             </td>
@@ -8173,6 +8180,33 @@ $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $setting
                     padding: 12px;
                     margin-bottom: 10px;
                     border-radius: 8px;
+                }
+                
+                /* Search Results Table Styling */
+                .search-results-table .odd-row {
+                    background-color: #f8f9fa;
+                }
+                
+                .search-results-table .even-row {
+                    background-color: #ffffff;
+                }
+                
+                .search-results-table .odd-row:hover {
+                    background-color: #e9ecef;
+                }
+                
+                .search-results-table .even-row:hover {
+                    background-color: #f1f3f4;
+                }
+                
+                .search-results-table .corporate-customer {
+                    font-weight: bold;
+                    color: #0066cc;
+                }
+                
+                .search-results-table .corporate-customer:hover {
+                    color: #004499;
+                    text-decoration: none;
                 }
                 
                 /* Modal improvements */
