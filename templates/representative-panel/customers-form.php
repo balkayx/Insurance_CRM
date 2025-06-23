@@ -3066,5 +3066,79 @@ jQuery(document).ready(function($) {
     
     // Sayfa yüklendiğinde başlangıç ayarlarını çağır
     initializeForm();
+    
+    // İsim formatlama fonksiyonu
+    function formatName(value) {
+        if (!value) return '';
+        
+        // Boşluklara göre ayır ve her kelimeyi formatla
+        return value.toLowerCase().split(' ').map(function(word) {
+            if (word.length === 0) return '';
+            // İlk harf büyük, geri kalanı küçük
+            return word.charAt(0).toUpperCase() + word.slice(1);
+        }).join(' ');
+    }
+    
+    // Soyisim formatlama fonksiyonu (tamamen büyük harf)
+    function formatLastName(value) {
+        if (!value) return '';
+        return value.toUpperCase();
+    }
+    
+    // Şirket adı formatlama fonksiyonu
+    function formatCompanyName(value) {
+        if (!value) return '';
+        
+        // Her kelimenin ilk harfi büyük olsun
+        return value.toLowerCase().split(' ').map(function(word) {
+            if (word.length === 0) return '';
+            return word.charAt(0).toUpperCase() + word.slice(1);
+        }).join(' ');
+    }
+    
+    // İsim alanlarına formatlanma event'leri ekle
+    $('#first_name').on('blur', function() {
+        $(this).val(formatName($(this).val()));
+    });
+    
+    $('#last_name').on('blur', function() {
+        $(this).val(formatLastName($(this).val()));
+    });
+    
+    $('#company_name').on('blur', function() {
+        $(this).val(formatCompanyName($(this).val()));
+    });
+    
+    // Eş adı için de formatlanma
+    $('#spouse_name').on('blur', function() {
+        const spouseName = $(this).val();
+        if (spouseName) {
+            // Eş adı da "Ad SOYAD" formatında olsun
+            const nameParts = spouseName.split(' ');
+            if (nameParts.length >= 2) {
+                const firstName = nameParts.slice(0, -1).map(name => formatName(name)).join(' ');
+                const lastName = formatLastName(nameParts[nameParts.length - 1]);
+                $(this).val(firstName + ' ' + lastName);
+            } else {
+                $(this).val(formatName(spouseName));
+            }
+        }
+    });
+    
+    // Çocuk isimleri için formatlanma (dinamik olarak eklenen alanlar için)
+    $(document).on('blur', '.child-name-input', function() {
+        const childName = $(this).val();
+        if (childName) {
+            // Çocuk adı da "Ad SOYAD" formatında olsun
+            const nameParts = childName.split(' ');
+            if (nameParts.length >= 2) {
+                const firstName = nameParts.slice(0, -1).map(name => formatName(name)).join(' ');
+                const lastName = formatLastName(nameParts[nameParts.length - 1]);
+                $(this).val(firstName + ' ' + lastName);
+            } else {
+                $(this).val(formatName(childName));
+            }
+        }
+    });
 });
 </script>

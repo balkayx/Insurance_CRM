@@ -142,6 +142,16 @@ function force_update_crm_db() {
         error_log('offer_reminder column added to customers table');
     }
     
+    // **NEW**: Add gross_premium column for Kasko/Trafik policies
+    $policies_table = $wpdb->prefix . 'insurance_crm_policies';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$policies_table'") == $policies_table) {
+        $gross_premium_exists = $wpdb->get_results("SHOW COLUMNS FROM `{$policies_table}` LIKE 'gross_premium'");
+        if (empty($gross_premium_exists)) {
+            $wpdb->query("ALTER TABLE `{$policies_table}` ADD COLUMN `gross_premium` DECIMAL(10,2) DEFAULT NULL AFTER `premium_amount`");
+            error_log('gross_premium column added to policies table');
+        }
+    }
+    
     // **NEW**: Add personal information fields to representatives table
     $representatives_table = $wpdb->prefix . 'insurance_crm_representatives';
     if ($wpdb->get_var("SHOW TABLES LIKE '$representatives_table'") == $representatives_table) {

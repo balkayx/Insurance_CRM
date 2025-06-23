@@ -96,6 +96,12 @@ if (!$insured_list_exists) {
     $wpdb->query("ALTER TABLE $policies_table ADD COLUMN insured_list TEXT DEFAULT NULL AFTER insurer");
 }
 
+// YENİ: Brüt prim için sütun (Kasko/Trafik için)
+$gross_premium_exists = $wpdb->get_row("SHOW COLUMNS FROM $policies_table LIKE 'gross_premium'");
+if (!$gross_premium_exists) {
+    $wpdb->query("ALTER TABLE $policies_table ADD COLUMN gross_premium DECIMAL(10,2) DEFAULT NULL AFTER premium_amount");
+}
+
 $editing = isset($_GET['action']) && $_GET['action'] === 'edit' && isset($_GET['id']) && intval($_GET['id']) > 0;
 $renewing = isset($_GET['action']) && $_GET['action'] === 'renew' && isset($_GET['id']) && intval($_GET['id']) > 0;
 $cancelling = isset($_GET['action']) && $_GET['action'] === 'cancel' && isset($_GET['id']) && intval($_GET['id']) > 0;
@@ -258,6 +264,7 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
         'start_date' => sanitize_text_field($_POST['start_date']),
         'end_date' => sanitize_text_field($_POST['end_date']),
         'premium_amount' => floatval($_POST['premium_amount']),
+        'gross_premium' => isset($_POST['gross_premium']) ? floatval($_POST['gross_premium']) : null,
         'payment_info' => isset($_POST['payment_info']) ? sanitize_text_field($_POST['payment_info']) : '',
         'network' => isset($_POST['network']) ? sanitize_text_field($_POST['network']) : '',
         'status' => sanitize_text_field($_POST['status']),
@@ -1690,6 +1697,16 @@ if ($user_role == 1 || $user_role == 2):
                                        step="0.01" min="0" required placeholder="Prim tutarı giriniz">
                             </div>
                             
+                            <!-- Brüt Prim Alanı (Kasko/Trafik için) -->
+                            <div class="ab-form-group" id="gross_premium_group" style="display: none;">
+                                <label for="gross_premium">Brüt Prim (₺)</label>
+                                <input type="number" name="gross_premium" id="gross_premium" class="ab-input" 
+                                       value="<?php echo isset($policy) && $policy->gross_premium > 0 ? esc_attr($policy->gross_premium) : ''; ?>" 
+                                       step="0.01" min="0" placeholder="Brüt prim tutarı giriniz">
+                            </div>
+                        </div>
+                        
+                        <div class="ab-form-row">
                             <div class="ab-form-group">
                                 <label for="payment_info">Ödeme Bilgisi</label>
                                 <select name="payment_info" id="payment_info" class="ab-select">
@@ -2602,7 +2619,10 @@ function setupExistingFunctionality() {
     // Poliçe türü değiştiğinde plaka alanını kontrol et
     const policyTypeSelect = document.getElementById('policy_type');
     if (policyTypeSelect) {
-        policyTypeSelect.addEventListener('change', updatePlateField);
+        policyTypeSelect.addEventListener('change', function() {
+            updatePlateField();
+            updateGrossPremiumField();
+        });
     }
     
     // Diğer form olaylarını kur
@@ -2796,6 +2816,28 @@ function updatePlateField() {
     }
 }
 
+// Kasko/Trafik seçiminde brüt prim alanını göster/gizle
+function updateGrossPremiumField() {
+    const policyTypeSelect = document.getElementById('policy_type');
+    const grossPremiumGroup = document.getElementById('gross_premium_group');
+    
+    if (!policyTypeSelect || !grossPremiumGroup) return;
+    
+    const policyType = policyTypeSelect.value.toLowerCase();
+    
+    // Kasko veya Trafik seçiliyse brüt prim alanını göster
+    if (policyType === 'kasko' || policyType === 'trafik') {
+        grossPremiumGroup.style.display = 'block';
+    } else {
+        // Diğer poliçe türleri için brüt prim alanını gizle
+        grossPremiumGroup.style.display = 'none';
+        const grossPremiumInput = document.getElementById('gross_premium');
+        if (grossPremiumInput) {
+            grossPremiumInput.value = ''; // Brüt prim değerini temizle
+        }
+    }
+}
+
 // AJAX endpoint'i için destek
 var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
 
@@ -2803,6 +2845,7 @@ var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
 window.addEventListener('load', function() {
     setTimeout(function() {
         updatePlateField(); // Poliçe türüne göre plaka alanını kontrol et
+        updateGrossPremiumField(); // Poliçe türüne göre brüt prim alanını kontrol et
         
         // Sigorta şirketi ve poliçe kategorisi için varsayılan değerler
         const insuranceCompany = document.getElementById('insurance_company');

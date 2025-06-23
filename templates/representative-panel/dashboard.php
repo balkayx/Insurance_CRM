@@ -1305,7 +1305,12 @@ if ($current_view == 'search' && isset($_GET['keyword']) && !empty(trim($_GET['k
             AND (
                 CONCAT(TRIM(c.first_name), ' ', TRIM(c.last_name)) LIKE %s
                 OR TRIM(c.tc_identity) LIKE %s
+                OR TRIM(c.spouse_name) LIKE %s
+                OR TRIM(c.spouse_tc_identity) LIKE %s
+                OR TRIM(c.children_names) LIKE %s
                 OR TRIM(c.children_tc_identities) LIKE %s
+                OR TRIM(c.company_name) LIKE %s
+                OR TRIM(c.tax_number) LIKE %s
                 OR TRIM(p.policy_number) LIKE %s
             )
             GROUP BY c.id
@@ -1314,10 +1319,15 @@ if ($current_view == 'search' && isset($_GET['keyword']) && !empty(trim($_GET['k
         ";
         
         $search_params = array_merge($rep_ids, [
-            '%' . $wpdb->esc_like($keyword) . '%',
-            '%' . $wpdb->esc_like($keyword) . '%',
-            '%' . $wpdb->esc_like($keyword) . '%',
-            '%' . $wpdb->esc_like($keyword) . '%',
+            '%' . $wpdb->esc_like($keyword) . '%', // customer name
+            '%' . $wpdb->esc_like($keyword) . '%', // customer tc
+            '%' . $wpdb->esc_like($keyword) . '%', // spouse name  
+            '%' . $wpdb->esc_like($keyword) . '%', // spouse tc
+            '%' . $wpdb->esc_like($keyword) . '%', // children names
+            '%' . $wpdb->esc_like($keyword) . '%', // children tc
+            '%' . $wpdb->esc_like($keyword) . '%', // company name
+            '%' . $wpdb->esc_like($keyword) . '%', // tax number (VKN)
+            '%' . $wpdb->esc_like($keyword) . '%', // policy number
             20
         ]);
         
@@ -1741,8 +1751,9 @@ include_once __DIR__ . '/loader.php';
                 <div class="search-box">
                     <form action="<?php echo generate_panel_url('search'); ?>" method="get">
                         <i class="dashicons dashicons-search"></i>
-                        <input type="text" name="keyword" placeholder="Ad, TC No, Çocuk Tc No.." value="<?php echo isset($_GET['keyword']) ? esc_attr($_GET['keyword']) : ''; ?>">
+                        <input type="text" name="keyword" placeholder="Ad, TC No, Eş Adı, Çocuk Adı, Firma Adı, VKN..." value="<?php echo isset($_GET['keyword']) ? esc_attr($_GET['keyword']) : ''; ?>">
                         <input type="hidden" name="view" value="search">
+                        <button type="submit" class="search-button">ARA</button>
                     </form>
                 </div>
                 
@@ -5578,13 +5589,20 @@ $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $setting
                 margin-right: 20px;
             }
             
+            .search-box form {
+                display: flex;
+                align-items: center;
+                position: relative;
+            }
+            
             .search-box input {
                 padding: 8px 15px 8px 35px;
                 border: 1px solid #e0e0e0;
-                border-radius: 20px;
+                border-radius: 20px 0 0 20px;
                 width: 250px;
                 font-size: 14px;
                 transition: all 0.3s;
+                border-right: none;
             }
             
             .search-box input:focus {
@@ -5600,6 +5618,25 @@ $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $setting
                 top: 50%;
                 transform: translateY(-50%);
                 color: #666;
+                z-index: 2;
+            }
+            
+            .search-button {
+                padding: 8px 15px;
+                background: #0073aa;
+                color: white;
+                border: 1px solid #0073aa;
+                border-radius: 0 20px 20px 0;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s;
+                border-left: none;
+            }
+            
+            .search-button:hover {
+                background: #005a8c;
+                border-color: #005a8c;
             }
             
             .help-icon {
