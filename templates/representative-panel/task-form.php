@@ -601,33 +601,40 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
                             </label>
                             
                             <div class="customer-search-section">
-                                <!-- Customer Search -->
-                                <div class="customer-search-container">
-                                    <input type="text" id="customer_search" class="form-input" 
-                                           placeholder="Müşteri adı, TC kimlik no, telefon ile arama..." autocomplete="off">
-                                </div>
-                                
-                                <!-- Search Results -->
-                                <div id="customer_search_results" class="search-results" style="display: none;"></div>
-                                
-                                <!-- Selected Customer Display -->
-                                <div id="selected_customer_display" class="selected-customer" style="display: none;">
-                                    <div class="selected-customer-info">
-                                        <div class="customer-avatar">
-                                            <i class="fas fa-user"></i>
+                                <!-- Modern Customer Search -->
+                                <div class="ab-customer-search-container">
+                                    <div class="ab-search-input-wrapper">
+                                        <i class="fas fa-search ab-search-icon"></i>
+                                        <input type="text" id="customer_search" class="form-input ab-customer-search" 
+                                               placeholder="Ad, soyad, TC kimlik no, telefon, firma adı ile arama..." 
+                                               autocomplete="off" value="">
+                                        <div class="ab-search-loading" style="display: none;">
+                                            <i class="fas fa-spinner fa-spin"></i>
                                         </div>
-                                        <div class="customer-details">
-                                            <div class="customer-name"></div>
-                                            <div class="customer-meta"></div>
-                                        </div>
-                                        <button type="button" class="btn btn-outline btn-sm" onclick="clearCustomerSelection()">
-                                            <i class="fas fa-times"></i> Değiştir
-                                        </button>
                                     </div>
+                                    
+                                    <!-- Search Results Container -->
+                                    <div id="customer_search_results" class="ab-search-results-container" style="display: none;"></div>
+                                    
+                                    <!-- Selected Customer Display -->
+                                    <div id="selected_customer_display" class="ab-selected-customer-container" style="display: none;">
+                                        <div class="ab-customer-card">
+                                            <div class="ab-customer-avatar">
+                                                <i class="fas fa-user"></i>
+                                            </div>
+                                            <div class="ab-customer-info">
+                                                <div class="ab-customer-name"></div>
+                                                <div class="ab-customer-details"></div>
+                                            </div>
+                                            <button type="button" class="btn btn-outline btn-sm" onclick="clearCustomerSelection()">
+                                                <i class="fas fa-times"></i> Değiştir
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Hidden input for selected customer -->
+                                    <input type="hidden" name="customer_id" id="selected_customer_id" value="<?php echo $selected_customer_id; ?>">
                                 </div>
-                                
-                                <!-- Hidden input for selected customer -->
-                                <input type="hidden" name="customer_id" id="selected_customer_id" value="<?php echo $selected_customer_id; ?>">
                             </div>
                         </div>
                     </div>
@@ -971,6 +978,145 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
 /* Müşteri Seçici */
 .customer-search-section {
     position: relative;
+}
+
+.ab-customer-search-container {
+    position: relative;
+}
+
+.ab-search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.ab-search-icon {
+    position: absolute;
+    left: 12px;
+    color: var(--on-surface-variant);
+    font-size: 14px;
+    z-index: 2;
+}
+
+.ab-customer-search {
+    padding-left: 40px !important;
+    padding-right: 40px !important;
+}
+
+.ab-search-loading {
+    position: absolute;
+    right: 12px;
+    color: var(--primary);
+}
+
+.ab-search-results-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: white;
+    border: 1px solid var(--outline-variant);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+.ab-search-result-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--outline-variant);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ab-search-result-item:hover {
+    background-color: var(--surface-variant);
+}
+
+.ab-search-result-item:last-child {
+    border-bottom: none;
+}
+
+.ab-search-result-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.ab-search-result-info {
+    flex: 1;
+}
+
+.ab-search-result-name {
+    font-weight: 600;
+    color: var(--on-surface);
+    margin-bottom: 2px;
+}
+
+.ab-search-result-details {
+    font-size: 12px;
+    color: var(--on-surface-variant);
+}
+
+.ab-search-no-results {
+    padding: 20px;
+    text-align: center;
+    color: var(--on-surface-variant);
+    font-style: italic;
+}
+
+.ab-selected-customer-container {
+    margin-top: var(--spacing-md);
+}
+
+.ab-customer-card {
+    background: var(--surface-variant);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.ab-customer-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.ab-customer-info {
+    flex: 1;
+}
+
+.ab-customer-name {
+    font-weight: 600;
+    color: var(--on-surface);
+    margin-bottom: 4px;
+}
+
+.ab-customer-details {
+    font-size: 13px;
+    color: var(--on-surface-variant);
 }
 
 .customer-search-container {
@@ -1452,6 +1598,75 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
     }
 }
 
+/* Form Validation Styles */
+.input-error {
+    border-color: var(--danger) !important;
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2) !important;
+}
+
+.error-message {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--danger);
+    font-size: 12px;
+    margin-top: 4px;
+    font-weight: 500;
+}
+
+.error-message i {
+    font-size: 11px;
+}
+
+/* Task Notification Styles */
+.task-notification {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    animation: slideInDown 0.3s ease;
+}
+
+.task-notification.notification-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-left: 4px solid #f39c12;
+    color: #856404;
+}
+
+.task-notification.notification-info {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    border-left: 4px solid #17a2b8;
+    color: #0c5460;
+}
+
+.task-notification.notification-error {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    border-left: 4px solid #dc3545;
+    color: #721c24;
+}
+
+.task-notification .notification-content {
+    flex: 1;
+}
+
+.task-notification .notification-close {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.task-notification .notification-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .task-form-container {
@@ -1613,7 +1828,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function displaySearchResults(customers) {
         if (!customers || customers.length === 0) {
-            customerSearchResults.innerHTML = '<div class="search-no-results">Müşteri bulunamadı.</div>';
+            customerSearchResults.innerHTML = '<div class="ab-search-no-results">🔍 Müşteri bulunamadı</div>';
             return;
         }
         
@@ -1630,14 +1845,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const safeCompanyName = (customer.company_name || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
             
             html += `
-                <div class="search-result-item" onclick="selectCustomer(${customer.id}, '${safeDisplayName}', '${safeTcVkn}', '${safePhone}', '${safeCompanyName}')">
-                    <div class="search-result-avatar">
+                <div class="ab-search-result-item" onclick="selectCustomer(${customer.id}, '${safeDisplayName}', '${safeTcVkn}', '${safePhone}', '${safeCompanyName}')">
+                    <div class="ab-search-result-avatar">
                         <i class="fas fa-${customer.company_name ? 'building' : 'user'}"></i>
                     </div>
-                    <div class="search-result-info">
-                        <div class="search-result-name">${displayName}</div>
-                        <div class="search-result-meta">
-                            ${customer.company_name ? 'VKN' : 'TC'}: ${tcVkn} | Tel: ${phone}
+                    <div class="ab-search-result-info">
+                        <div class="ab-search-result-name">${displayName}</div>
+                        <div class="ab-search-result-details">
+                            ${customer.company_name ? 'Kurumsal • VKN' : 'Bireysel • TC'}: ${tcVkn} • Tel: ${phone}
                         </div>
                     </div>
                 </div>
@@ -1673,13 +1888,13 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     function displaySelectedCustomer(customerData) {
-        const nameEl = selectedCustomerDisplay.querySelector('.customer-name');
-        const metaEl = selectedCustomerDisplay.querySelector('.customer-meta');
-        const avatarEl = selectedCustomerDisplay.querySelector('.customer-avatar i');
+        const nameEl = selectedCustomerDisplay.querySelector('.ab-customer-name');
+        const detailsEl = selectedCustomerDisplay.querySelector('.ab-customer-details');
+        const avatarEl = selectedCustomerDisplay.querySelector('.ab-customer-avatar i');
         
-        nameEl.textContent = customerData.name;
-        metaEl.textContent = `${customerData.is_company ? 'VKN' : 'TC'}: ${customerData.tc_vkn} | Tel: ${customerData.phone}`;
-        avatarEl.className = `fas fa-${customerData.is_company ? 'building' : 'user'}`;
+        if (nameEl) nameEl.textContent = customerData.name;
+        if (detailsEl) detailsEl.textContent = `${customerData.is_company ? 'Kurumsal • VKN' : 'Bireysel • TC'}: ${customerData.tc_vkn} • Tel: ${customerData.phone}`;
+        if (avatarEl) avatarEl.className = `fas fa-${customerData.is_company ? 'building' : 'user'}`;
         
         selectedCustomerDisplay.style.display = 'block';
         customerSearchResults.style.display = 'none';
@@ -1872,6 +2087,35 @@ document.addEventListener('DOMContentLoaded', function() {
             const requiredInputs = form.querySelectorAll('[required]');
             let formValid = true;
             
+            // ÖNEMLİ: Müşteri seçimi kontrolü
+            const customerIdValue = selectedCustomerId.value;
+            if (!customerIdValue || customerIdValue.trim() === '') {
+                formValid = false;
+                
+                // Müşteri arama alanına hata ekle
+                customerSearchInput.classList.add('input-error');
+                
+                // Hata mesajı göster
+                let errorMsg = customerSearchInput.parentElement.querySelector('.error-message');
+                if (!errorMsg) {
+                    errorMsg = document.createElement('div');
+                    errorMsg.className = 'error-message';
+                    errorMsg.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Lütfen bir müşteri seçiniz';
+                    customerSearchInput.parentElement.appendChild(errorMsg);
+                }
+                
+                console.log('❌ Customer selection required');
+            } else {
+                // Müşteri seçimi var ise hata sınıfını kaldır
+                customerSearchInput.classList.remove('input-error');
+                const existingError = customerSearchInput.parentElement.querySelector('.error-message');
+                if (existingError) {
+                    existingError.remove();
+                }
+                console.log('✅ Customer selected:', customerIdValue);
+            }
+            
+            // Diğer zorunlu alanları kontrol et
             requiredInputs.forEach(input => {
                 if (!input.value.trim()) {
                     formValid = false;
