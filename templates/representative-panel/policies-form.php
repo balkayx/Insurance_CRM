@@ -351,7 +351,7 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
                 $message = 'Poliçe başarıyla ' . $action_text . '.';
                 $message_type = 'success';
                 $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
-                $redirect_url = build_redirect_url_with_filters(['view' => 'policies', 'updated' => 'true']);
+                $redirect_url = build_redirect_url_with_filters(['view' => 'policies', 'action' => 'view', 'id' => $policy_id]);
                 wp_redirect($redirect_url);
                 exit;
             } else {
@@ -407,7 +407,7 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
             $message = 'Poliçe başarıyla eklendi.';
             $message_type = 'success';
             $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
-            $redirect_url = build_redirect_url_with_filters(['view' => 'policies', 'added' => 'true']);
+            $redirect_url = build_redirect_url_with_filters(['view' => 'policies', 'action' => 'view', 'id' => $new_policy_id]);
             wp_redirect($redirect_url);
             exit;
         } else {

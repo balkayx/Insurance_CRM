@@ -387,7 +387,10 @@ if (isset($_POST['save_customer']) && isset($_POST['customer_nonce']) && wp_veri
             
             // Başarılı işlemden sonra yönlendirme
             $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
-            echo '<script>window.location.href = "?view=customers&added=true";</script>';
+            $_SESSION['show_policy_prompt'] = true; // Poliçe ekleme sorgusu için flag
+            $_SESSION['new_customer_id'] = $new_customer_id; // Yeni müşteri ID'si
+            $_SESSION['new_customer_name'] = $customer_data['first_name'] . ' ' . $customer_data['last_name']; // Müşteri adı soyadı
+            echo '<script>window.location.href = "?view=customers&action=view&id=' . $new_customer_id . '";</script>';
             exit;
         } else {
             $message = 'Müşteri eklenirken bir hata oluştu: ' . $wpdb->last_error;

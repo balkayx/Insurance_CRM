@@ -704,6 +704,41 @@ function format_file_size($size) {
         <?php unset($_SESSION['crm_notice']); ?>
     <?php endif; ?>
 
+    <?php if (isset($_SESSION['show_policy_prompt']) && $_SESSION['show_policy_prompt']): ?>
+        <div class="ab-notice ab-success" style="margin-bottom: 20px;">
+            <p><strong>Müşteri başarıyla eklendi!</strong></p>
+            <p>Bu müşteri için yeni bir poliçe eklemek ister misiniz?</p>
+            <div style="margin-top: 15px;">
+                <a href="?view=policies&action=add&customer_search=<?php echo urlencode($_SESSION['new_customer_name'] ?? ''); ?>" 
+                   class="ab-btn ab-btn-primary" style="margin-right: 10px;">
+                    <i class="fas fa-plus"></i> Evet, Poliçe Ekle
+                </a>
+                <button type="button" class="ab-btn ab-btn-secondary" onclick="dismissPolicyPrompt()">
+                    <i class="fas fa-times"></i> Hayır, Teşekkürler
+                </button>
+            </div>
+        </div>
+        <script>
+        function dismissPolicyPrompt() {
+            document.querySelector('.ab-notice.ab-success').style.display = 'none';
+            // AJAX ile session değişkenini temizle
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'action=dismiss_policy_prompt&nonce=<?php echo wp_create_nonce('dismiss_policy_prompt'); ?>'
+            });
+        }
+        </script>
+        <?php 
+        // Session değişkenlerini temizle
+        unset($_SESSION['show_policy_prompt']);
+        unset($_SESSION['new_customer_id']);
+        unset($_SESSION['new_customer_name']);
+        ?>
+    <?php endif; ?>
+
     <div id="ajax-response-container"></div>
     
     <!-- Müşteri Bilgileri -->
@@ -1295,7 +1330,7 @@ function format_file_size($size) {
                             ?>
                                 <tr class="<?php echo $row_class; ?>">
                                     <td>
-                                        <a href="?view=policies&action=edit&id=<?php echo $policy->id; ?>">
+                                        <a href="?view=policies&action=view&id=<?php echo $policy->id; ?>">
                                             <?php echo esc_html($policy->policy_number); ?>
                                         </a>
                                         <?php if ($is_expired): ?>
@@ -2008,56 +2043,82 @@ function format_file_size($size) {
     margin-top: 15px;
 }
 
-.ab-note {
-    border: 1px solid #eee;
-    border-radius: 4px;
-    padding: 15px;
+.ab-note-item {
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+    padding: 16px;
     position: relative;
     background-color: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.ab-note-positive {
+.ab-note-item:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.ab-note-item.ab-note-positive {
     border-left: 4px solid #4caf50;
+    background: linear-gradient(135deg, #fff, #f8fff8);
 }
 
-.ab-note-negative {
+.ab-note-item.ab-note-negative {
     border-left: 4px solid #f44336;
+    background: linear-gradient(135deg, #fff, #fff8f8);
 }
 
-.ab-note-neutral {
+.ab-note-item.ab-note-neutral {
     border-left: 4px solid #ff9800;
+    background: linear-gradient(135deg, #fff, #fffbf5);
 }
 
 .ab-note-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f0;
 }
 
 .ab-note-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    font-size: 13px;
-    color: #666;
+    gap: 12px;
+    font-size: 12px;
+    color: #6c757d;
+    align-items: center;
 }
 
 .ab-note-meta i {
-    margin-right: 3px;
+    margin-right: 4px;
+    opacity: 0.7;
+}
+
+.ab-note-user, .ab-note-date {
+    background: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 500;
 }
 
 .ab-note-content {
-    margin-bottom: 10px;
-    line-height: 1.5;
+    margin-bottom: 12px;
+    line-height: 1.6;
+    color: #333;
+    font-size: 14px;
+    padding: 8px 0;
 }
 
 .ab-note-reason {
     font-size: 12px;
-    color: #666;
-    padding-top: 8px;
-    border-top: 1px dashed #eee;
+    color: #6c757d;
+    padding: 8px 12px;
+    border-top: 1px solid #e9ecef;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin-top: 8px;
 }
 
 /* Badge Stilleri */
