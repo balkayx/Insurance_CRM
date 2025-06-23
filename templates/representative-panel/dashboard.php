@@ -4391,7 +4391,8 @@ include_once __DIR__ . '/loader.php';
                             <table class="data-table search-results-table">
                                 <thead>
                                     <tr>
-                                        <th><?php esc_html_e('Ad Soyad', 'insurance-crm'); ?></th>
+                                        <th><?php esc_html_e('Tür', 'insurance-crm'); ?></th>
+                                        <th><?php esc_html_e('Ad Soyad / Firma Adı', 'insurance-crm'); ?></th>
                                         <th><?php esc_html_e('TC Kimlik', 'insurance-crm'); ?></th>
                                         <th><?php esc_html_e('Çocuk Ad Soyad', 'insurance-crm'); ?></th>
                                         <th><?php esc_html_e('Çocuk TC Kimlik', 'insurance-crm'); ?></th>
@@ -4408,6 +4409,11 @@ include_once __DIR__ . '/loader.php';
                                         $row_class = ($row_count % 2 == 0) ? 'even-row' : 'odd-row';
                                     ?>
                                         <tr class="<?php echo $row_class; ?>">
+                                            <td>
+                                                <span class="customer-type-badge <?php echo $is_corporate ? 'corporate-badge' : 'personal-badge'; ?>">
+                                                    <?php echo $is_corporate ? 'Kurumsal' : 'Kişisel'; ?>
+                                                </span>
+                                            </td>
                                             <td>
                                                 <a href="?view=customers&action=view&id=<?php echo esc_attr($customer->id); ?>" 
                                                    class="ab-customer-name <?php echo $is_corporate ? 'corporate-customer' : ''; ?>">
@@ -8213,6 +8219,29 @@ $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $setting
                 .search-results-table .corporate-customer:hover {
                     color: #004499;
                     text-decoration: none;
+                }
+                
+                /* Customer Type Badges */
+                .customer-type-badge {
+                    display: inline-block;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    text-align: center;
+                    min-width: 60px;
+                }
+                
+                .corporate-badge {
+                    background: #e3f2fd;
+                    color: #1976d2;
+                    border: 1px solid #90caf9;
+                }
+                
+                .personal-badge {
+                    background: #f3e5f5;
+                    color: #7b1fa2;
+                    border: 1px solid #ce93d8;
                 }
                 
                 /* Modal improvements */
