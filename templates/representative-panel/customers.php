@@ -796,17 +796,17 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
                 
                 <div class="filters-grid">
                     <div class="filter-group">
-                        <label for="filter_search">Müşteri Adı</label>
+                        <label for="filter_search">Müşteri Adı / Firma Adı</label>
                         <input type="text" id="filter_search" name="customer_name" 
                                value="<?php echo esc_attr($search); ?>" 
-                               placeholder="Müşteri Adı ile ara..." class="form-input">
+                               placeholder="Müşteri Ad Soyad veya Kurumsal Firma Adı..." class="form-input">
                     </div>
 
                     <div class="filter-group">
-                        <label for="filter_customer_tc">TC Kimlik No</label>
+                        <label for="filter_customer_tc">TC Kimlik No / VKN</label>
                         <input type="text" id="filter_customer_tc" name="customer_tc" 
                                value="<?php echo esc_attr($customer_tc_filter); ?>" 
-                               placeholder="TC Kimlik No ile ara..." class="form-input">
+                               placeholder="TC Kimlik No veya VKN..." class="form-input">
                     </div>
 
                     <div class="filter-group">
@@ -2628,9 +2628,10 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
 }
 
 .company-name {
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-base);
     color: var(--on-surface-variant);
     margin-top: var(--spacing-xs);
+    font-weight: bold;
 }
 
 .customer-badges {

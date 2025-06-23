@@ -20,6 +20,12 @@ $settings = get_option('insurance_crm_settings', []);
 $insurance_companies = array_unique($settings['insurance_companies'] ?? ['Sompo']);
 sort($insurance_companies);
 
+// Payment options from settings
+$payment_options = $settings['payment_options'] ?? ['Peşin', '3 Taksit', '6 Taksit', '8 Taksit', '9 Taksit', '12 Taksit', 'Ödenmedi', 'Nakit', 'Kredi Kartı', 'Havale', 'Diğer'];
+
+// Cancellation reasons
+$cancellation_reasons = ['Araç Satışı', 'İsteğe Bağlı', 'Tahsilattan İptal', 'Diğer Sebepler'];
+
 // Ensure gross_premium column exists
 $gross_premium_exists = $wpdb->get_row("SHOW COLUMNS FROM $policies_table LIKE 'gross_premium'");
 if (!$gross_premium_exists) {
@@ -29,7 +35,8 @@ if (!$gross_premium_exists) {
 // Determine action and policy ID
 $editing = isset($_GET['action']) && $_GET['action'] === 'edit' && isset($_GET['id']) && intval($_GET['id']) > 0;
 $renewing = isset($_GET['action']) && $_GET['action'] === 'renew' && isset($_GET['id']) && intval($_GET['id']) > 0;
-$policy_id = $editing || $renewing ? intval($_GET['id']) : 0;
+$cancelling = isset($_GET['action']) && $_GET['action'] === 'cancel' && isset($_GET['id']) && intval($_GET['id']) > 0;
+$policy_id = $editing || $renewing || $cancelling ? intval($_GET['id']) : 0;
 
 if (!$policy_id) {
     echo '<div class="ab-notice ab-error">Geçersiz poliçe ID.</div>';
@@ -73,6 +80,13 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
         'status' => sanitize_text_field($_POST['status']),
         'updated_at' => current_time('mysql')
     );
+    
+    // Handle cancellation
+    if ($cancelling) {
+        $policy_data['status'] = 'iptal';
+        $policy_data['cancellation_reason'] = isset($_POST['cancellation_reason']) ? sanitize_text_field($_POST['cancellation_reason']) : '';
+        $policy_data['cancellation_date'] = current_time('mysql');
+    }
     
     if (in_array(strtolower($policy_data['policy_type']), ['kasko', 'trafik']) && isset($_POST['plate_number'])) {
         $policy_data['plate_number'] = sanitize_text_field($_POST['plate_number']);
@@ -215,8 +229,8 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
     <div class="ab-container">
         <div class="ab-header">
             <div class="ab-header-content">
-                <h1><i class="fas fa-edit"></i> <?php echo $editing ? 'Poliçe Düzenle' : 'Poliçe Yenile'; ?></h1>
-                <p>Poliçe bilgilerini düzenleyin veya yenileyin</p>
+                <h1><i class="fas fa-<?php echo $cancelling ? 'ban' : 'edit'; ?>"></i> <?php echo $cancelling ? 'Poliçe İptal Et' : ($editing ? 'Poliçe Düzenle' : 'Poliçe Yenile'); ?></h1>
+                <p><?php echo $cancelling ? 'Poliçeyi iptal edin' : 'Poliçe bilgilerini düzenleyin veya yenileyin'; ?></p>
             </div>
             <div class="ab-header-actions">
                 <a href="?view=policies" class="ab-btn ab-btn-secondary">
@@ -348,12 +362,23 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
                 <div class="ab-form-row">
                     <div class="ab-form-group">
                         <label for="status">Durum</label>
-                        <select name="status" id="status" class="ab-input">
-                            <option value="aktif" <?php selected($policy->status, 'aktif'); ?>>Aktif</option>
-                            <option value="pasif" <?php selected($policy->status, 'pasif'); ?>>Pasif</option>
-                            <option value="iptal" <?php selected($policy->status, 'iptal'); ?>>İptal</option>
+                        <select name="status" id="status" class="ab-input" <?php echo $cancelling ? 'readonly' : ''; ?>>
+                            <option value="aktif" <?php selected($cancelling ? 'iptal' : $policy->status, 'aktif'); ?>>Aktif</option>
+                            <option value="pasif" <?php selected($cancelling ? 'iptal' : $policy->status, 'pasif'); ?>>Pasif</option>
+                            <option value="iptal" <?php selected($cancelling ? 'iptal' : $policy->status, 'iptal'); ?>>İptal</option>
                         </select>
                     </div>
+                    <?php if ($cancelling): ?>
+                    <div class="ab-form-group">
+                        <label for="cancellation_reason">İptal Nedeni *</label>
+                        <select name="cancellation_reason" id="cancellation_reason" class="ab-input" required>
+                            <option value="">Seçiniz...</option>
+                            <?php foreach ($cancellation_reasons as $reason): ?>
+                            <option value="<?php echo esc_attr($reason); ?>"><?php echo esc_html($reason); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -375,8 +400,12 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
                 <div class="ab-form-row">
                     <div class="ab-form-group">
                         <label for="payment_info">Ödeme Bilgisi</label>
-                        <input type="text" name="payment_info" id="payment_info" class="ab-input" 
-                               value="<?php echo esc_attr($policy->payment_info ?? ''); ?>" placeholder="Ödeme şekli, taksit sayısı vb.">
+                        <select name="payment_info" id="payment_info" class="ab-input">
+                            <option value="">Seçiniz...</option>
+                            <?php foreach ($payment_options as $option): ?>
+                            <option value="<?php echo esc_attr($option); ?>" <?php selected($policy->payment_info ?? '', $option); ?>><?php echo esc_html($option); ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -398,9 +427,15 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
             </div>
 
             <div class="ab-form-actions">
+                <?php if ($cancelling): ?>
+                <button type="submit" name="save_policy" class="ab-btn ab-btn-danger" onclick="return confirm('Poliçeyi iptal etmek istediğinizden emin misiniz?');">
+                    <i class="fas fa-ban"></i> Poliçeyi İptal Et
+                </button>
+                <?php else: ?>
                 <button type="submit" name="save_policy" class="ab-btn ab-btn-primary">
                     <i class="fas fa-save"></i> <?php echo $editing ? 'Güncelle' : 'Yenile'; ?>
                 </button>
+                <?php endif; ?>
                 <a href="?view=policies&action=view&id=<?php echo $policy_id; ?>" class="ab-btn ab-btn-secondary">
                     <i class="fas fa-times"></i> İptal
                 </a>
@@ -662,6 +697,17 @@ document.addEventListener('DOMContentLoaded', function() {
     border-color: var(--color-primary);
 }
 
+.ab-btn-danger {
+    background: #dc3545;
+    color: #fff;
+    border: 2px solid #dc3545;
+}
+
+.ab-btn-danger:hover {
+    background: #c82333;
+    border-color: #c82333;
+}
+
 /* Form actions */
 .ab-form-actions {
     display: flex;
@@ -747,111 +793,5 @@ document.addEventListener('DOMContentLoaded', function() {
     font-size: 12px;
     color: var(--color-text-secondary);
     margin-top: var(--spacing-xs);
-}
-</style>
-    border-radius: 8px;
-    margin-bottom: 20px;
-    padding: 20px;
-}
-
-.ab-form-section h3 {
-    margin: 0 0 20px 0;
-    color: #333;
-    border-bottom: 2px solid #007cba;
-    padding-bottom: 10px;
-}
-
-.ab-form-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-    margin-bottom: 15px;
-}
-
-.ab-form-group {
-    display: flex;
-    flex-direction: column;
-}
-
-.ab-form-group label {
-    font-weight: 600;
-    margin-bottom: 5px;
-    color: #555;
-}
-
-.ab-input {
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.ab-input:focus {
-    border-color: #007cba;
-    outline: none;
-    box-shadow: 0 0 0 1px #007cba;
-}
-
-.ab-form-actions {
-    text-align: center;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid #ddd;
-}
-
-.ab-btn {
-    display: inline-block;
-    padding: 12px 24px;
-    margin: 0 10px;
-    border: none;
-    border-radius: 4px;
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.ab-btn-primary {
-    background: #007cba;
-    color: #fff;
-}
-
-.ab-btn-primary:hover {
-    background: #005a87;
-}
-
-.ab-btn-secondary {
-    background: #666;
-    color: #fff;
-}
-
-.ab-btn-secondary:hover {
-    background: #444;
-}
-
-.ab-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #ddd;
-}
-
-.ab-header-content h1 {
-    margin: 0;
-    color: #333;
-}
-
-.ab-header-content p {
-    margin: 5px 0 0 0;
-    color: #666;
-}
-
-.ab-form-help {
-    color: #666;
-    font-size: 12px;
-    margin-top: 5px;
 }
 </style>
