@@ -1808,13 +1808,8 @@ if ($user_role == 1 || $user_role == 2):
                     </div>
                 </div>
                 
-                <!-- SİGORTALI BİLGİLERİ (gizli alan) -->
-                <input type="hidden" name="insured_party" id="insured_party_hidden" value="<?php echo isset($policy) && !empty($policy->insured_party) ? esc_attr($policy->insured_party) : ''; ?>">
-                <input type="hidden" name="insured_party_list" id="insured_party_list_hidden" value="<?php echo isset($policy) && !empty($policy->insured_list) ? esc_attr($policy->insured_list) : ''; ?>">
-            </div>
-            
-            <!-- FORM AKSİYONLARI -->
-            <div class="ab-form-actions">
+                <!-- FORM AKSİYONLARI -->
+                <div class="ab-form-actions">
                 <div class="ab-form-actions-left">
                     <a href="<?php echo esc_url(build_redirect_url_with_filters(['view' => 'policies'])); ?>" class="ab-btn ab-btn-secondary">
                         <i class="fas fa-times"></i> İptal
@@ -2169,6 +2164,49 @@ function setupInteractiveFlow() {
         selectedCustomerDetails.style.display = 'block';
     }
     
+    // Düzenleme/yenileme modunda mevcut müşteri verilerini yükle
+    function loadExistingCustomerData(customerId) {
+        console.log('📋 Mevcut müşteri verileri yükleniyor, ID:', customerId);
+        
+        // AJAX isteği ile müşteri verilerini al
+        const formData = new FormData();
+        formData.append('action', 'get_customer_data');
+        formData.append('customer_id', customerId);
+        formData.append('nonce', '<?php echo wp_create_nonce('insurance_crm_nonce'); ?>');
+        
+        fetch(ajaxurl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                console.log('✅ Müşteri verileri başarıyla yüklendi:', data.data);
+                
+                // Global selectedCustomer değişkenini ayarla
+                selectedCustomer = data.data;
+                window.selectedCustomer = data.data;
+                
+                // Müşteri detaylarını göster
+                displayCustomerDetails(data.data);
+                
+                // Müşteri seçim bölümünü tamamlanmış olarak işaretle
+                document.querySelector('.customer-selection-step').classList.add('completed');
+                
+                // Arama alanını da güncelle
+                const customerSearch = document.getElementById('customer_search');
+                if (customerSearch && !customerSearch.readOnly) {
+                    customerSearch.value = `${data.data.first_name} ${data.data.last_name}`;
+                }
+            } else {
+                console.error('❌ Müşteri verileri yüklenirken hata:', data);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Müşteri verileri yükleme hatası:', error);
+        });
+    }
+    
     // Aile üyelerini yükle - client-side alternatif yöntem
     function loadFamilyMembers(customerId) {
         console.log('🔍 Aile üyeleri yükleniyor (client-side), müşteri ID:', customerId);
@@ -2323,6 +2361,33 @@ function setupInteractiveFlow() {
         checkboxes.forEach(checkbox => {
             checkbox.addEventListener('change', updateInsuredPersonsField);
         });
+        
+        // Düzenleme modunda mevcut seçimleri geri yükle
+        if (isEditMode || isRenewMode) {
+            restorePreviousInsuredSelections();
+        }
+    }
+    
+    // Mevcut sigortalı seçimlerini geri yükle
+    function restorePreviousInsuredSelections() {
+        const existingInsuredList = document.getElementById('insured_party_list_hidden').value;
+        if (!existingInsuredList) return;
+        
+        console.log('🔄 Mevcut sigortalı seçimleri geri yükleniyor:', existingInsuredList);
+        
+        const insuredNames = existingInsuredList.split(',').map(name => name.trim());
+        const checkboxes = document.querySelectorAll('input[name="insured_persons[]"]');
+        
+        checkboxes.forEach(checkbox => {
+            const checkboxValue = checkbox.value.trim();
+            if (insuredNames.includes(checkboxValue)) {
+                checkbox.checked = true;
+                console.log('✅ Seçim geri yüklendi:', checkboxValue);
+            }
+        });
+        
+        // Seçimleri güncelle
+        updateInsuredPersonsField();
     }
     
     // Aile üyelerini göster
@@ -2516,6 +2581,9 @@ function setupInteractiveFlow() {
         const customerId = document.getElementById('selected_customer_id').value;
         if (customerId) {
             insuredQuestion.style.display = 'block';
+            
+            // Müşteri bilgilerini yükle ve göster
+            loadExistingCustomerData(customerId);
             
             // Yenileme modunda aile üyelerini de yükle
             if (isRenewMode) {
