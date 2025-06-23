@@ -1060,6 +1060,12 @@ body {
         display: block;
     }
     
+    /* Force show policy details in edit/renewal modes */
+    body.edit-mode .policy-details-step,
+    body.renewal-mode .policy-details-step {
+        display: block !important;
+    }
+    
     .form-textarea {
         min-height: 100px;
     }
@@ -1526,7 +1532,7 @@ if ($user_role == 1 || $user_role == 2):
                         </div>
                         
                         <!-- SİGORTALI BELİRLEME SORUSU -->
-                        <div id="insured_question" class="insured-question" style="display: <?php echo $cancelling ? 'none' : 'block'; ?>;">
+                        <div id="insured_question" class="insured-question" style="display: <?php echo ($cancelling || $editing || $renewing) ? 'none' : 'block'; ?>;">
                             <h4><i class="fas fa-question-circle"></i> Sigorta Ettiren ile Sigortalı aynı kişi mi?</h4>
                             <div class="ab-form-row">
                                 <div class="ab-form-group">
@@ -1846,6 +1852,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const isRenewMode = <?php echo $renewing ? 'true' : 'false'; ?>;
     const isCancelMode = <?php echo $cancelling ? 'true' : 'false'; ?>;
     const isCreateFromOfferMode = <?php echo $create_from_offer ? 'true' : 'false'; ?>;
+    
+    // Body'ye mod class'ları ekle
+    if (isEditMode) document.body.classList.add('edit-mode');
+    if (isRenewMode) document.body.classList.add('renewal-mode');
+    if (isCancelMode) document.body.classList.add('cancel-mode');
+    if (isCreateFromOfferMode) document.body.classList.add('create-from-offer-mode');
     
     console.log('📋 Mod bilgileri:', {
         isEditMode, isRenewMode, isCancelMode, isCreateFromOfferMode
