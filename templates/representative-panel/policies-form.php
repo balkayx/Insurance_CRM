@@ -2699,6 +2699,9 @@ function setupExistingFunctionality() {
     // Kasko/Trafik seçiminde plaka alanını göster/gizle
     updatePlateField();
     
+    // Kasko/Trafik seçiminde brüt prim alanını göster/gizle
+    updateGrossPremiumField();
+    
     // Sigorta şirketi ve poliçe kategorisi önceden seçili ise kontrol et
     const policyCategory = document.getElementById('policy_category');
     if (policyCategory && policyCategory.value === '') {
