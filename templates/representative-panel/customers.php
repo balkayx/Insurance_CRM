@@ -282,8 +282,7 @@ $offset = ($current_page - 1) * $per_page;
 
 // FİLTRELEME PARAMETRELERİ - Düzeltilmiş
 $search = isset($_GET['customer_name']) ? sanitize_text_field($_GET['customer_name']) : '';
-$quick_search = isset($_GET['quick_search']) ? sanitize_text_field($_GET['quick_search']) : '';
-$tc_vkn_search = isset($_GET['tc_vkn_search']) ? sanitize_text_field($_GET['tc_vkn_search']) : '';
+
 $status_filter = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
 $category_filter = isset($_GET['category']) ? sanitize_text_field($_GET['category']) : '';
 $representative_filter = isset($_GET['rep_id']) ? intval($_GET['rep_id']) : 0;
@@ -361,37 +360,7 @@ if (!empty($search)) {
     );
 }
 
-// Hızlı arama filtresi - Ad, Soyad, Firma Adı, TC, VKN ile arama
-if (!empty($quick_search)) {
-    $base_query .= $wpdb->prepare(
-        " AND (
-            c.first_name LIKE %s 
-            OR c.last_name LIKE %s 
-            OR CONCAT(c.first_name, ' ', c.last_name) LIKE %s
-            OR TRIM(COALESCE(c.company_name, '')) LIKE %s
-            OR TRIM(COALESCE(c.tc_identity, '')) LIKE %s
-            OR TRIM(COALESCE(c.tax_number, '')) LIKE %s
-        )",
-        '%' . $wpdb->esc_like($quick_search) . '%',
-        '%' . $wpdb->esc_like($quick_search) . '%',
-        '%' . $wpdb->esc_like($quick_search) . '%',
-        '%' . $wpdb->esc_like($quick_search) . '%',
-        '%' . $wpdb->esc_like($quick_search) . '%',
-        '%' . $wpdb->esc_like($quick_search) . '%'
-    );
-}
 
-// TC / VKN arama filtresi
-if (!empty($tc_vkn_search)) {
-    $base_query .= $wpdb->prepare(
-        " AND (
-            TRIM(COALESCE(c.tc_identity, '')) LIKE %s
-            OR TRIM(COALESCE(c.tax_number, '')) LIKE %s
-        )",
-        '%' . $wpdb->esc_like($tc_vkn_search) . '%',
-        '%' . $wpdb->esc_like($tc_vkn_search) . '%'
-    );
-}
 
 // Durum ve kategori filtreleri
 if (!empty($status_filter)) {
@@ -645,8 +614,6 @@ $show_list = ($current_action !== 'view' && $current_action !== 'edit' && $curre
 
 // Filtreleme yapıldı mı kontrolü
 $is_filtered = !empty($search) || 
-               !empty($quick_search) ||
-               !empty($tc_vkn_search) ||
                !empty($status_filter) || 
                !empty($category_filter) || 
                $representative_filter > 0 || 
@@ -666,8 +633,6 @@ $is_filtered = !empty($search) ||
 // Aktif filtre sayısını hesapla
 $active_filter_count = 0;
 if (!empty($search)) $active_filter_count++;
-if (!empty($quick_search)) $active_filter_count++;
-if (!empty($tc_vkn_search)) $active_filter_count++;
 if (!empty($status_filter)) $active_filter_count++;
 if (!empty($category_filter)) $active_filter_count++;
 if ($representative_filter > 0) $active_filter_count++;
@@ -819,32 +784,7 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
         <form method="GET" class="date-filter-form" id="customerSearchForm">
             <input type="hidden" name="view" value="<?php echo esc_attr($view_type); ?>">
             
-            <div class="date-filter-inputs">
-                <div class="date-input-group">
-                    <label for="customer_search_input">
-                        <i class="fas fa-search"></i> Ad Soyad / Firma Adı
-                    </label>
-                    <input type="text" name="quick_search" id="customer_search_input" 
-                           value="<?php echo isset($_GET['quick_search']) ? esc_attr($_GET['quick_search']) : ''; ?>" 
-                           placeholder="Ad, Soyad, Firma Adı ile ara" 
-                           class="form-input date-input">
-                </div>
-                
-                <div class="date-input-group">
-                    <label for="tc_search_input">
-                        <i class="fas fa-id-card"></i> TC / VKN
-                    </label>
-                    <input type="text" name="tc_vkn_search" id="tc_search_input" 
-                           value="<?php echo isset($_GET['tc_vkn_search']) ? esc_attr($_GET['tc_vkn_search']) : ''; ?>" 
-                           placeholder="TC Kimlik No veya VKN ile ara" 
-                           class="form-input date-input">
-                </div>
-                
-                <button type="submit" class="btn btn-primary date-filter-btn">
-                    <i class="fas fa-search"></i>
-                    ARA
-                </button>
-            </div>
+
         </form>
     </div>
 

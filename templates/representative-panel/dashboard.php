@@ -4411,7 +4411,13 @@ include_once __DIR__ . '/loader.php';
                                             <td>
                                                 <a href="?view=customers&action=view&id=<?php echo esc_attr($customer->id); ?>" 
                                                    class="ab-customer-name <?php echo $is_corporate ? 'corporate-customer' : ''; ?>">
-                                                    <?php echo esc_html($customer->customer_name); ?>
+                                                    <?php 
+                                                    if ($is_corporate) {
+                                                        echo '<strong>' . esc_html($customer->customer_name) . '</strong>';
+                                                    } else {
+                                                        echo esc_html($customer->customer_name);
+                                                    }
+                                                    ?>
                                                 </a>
                                             </td>
                                             <td><?php echo esc_html($customer->tc_identity); ?></td>
