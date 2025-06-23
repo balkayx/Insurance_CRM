@@ -1,10 +1,10 @@
 <?php
 /**
  * Görev Ekleme/Düzenleme Formu
- * @version 3.2.0
- * @date 2025-05-30 21:39:10
+ * @version 4.0.0
+ * @date 2025-06-23
  * @author anadolubirlik
- * @description Modern UI güncellemesi - Form iyileştirmeleri
+ * @description Policies-form.php tarzında yeniden tasarlandı
  */
 
 // Veritabanı kontrolü ve task_title alanı ekleme

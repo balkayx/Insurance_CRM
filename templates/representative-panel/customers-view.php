@@ -1130,64 +1130,92 @@ function format_file_size($size) {
                 </div>
 
                 <!-- Quote Form - Only show when toggling to offer status -->
-                <div id="quote-form-section" style="display: none;" class="ab-form-section">
-                    <h4><i class="fas fa-file-invoice"></i> Teklif Bilgileri</h4>
-                    <form id="quote-form" method="post">
+                <div id="quote-form-section" style="display: none;" class="modern-quote-form">
+                    <div class="quote-form-header">
+                        <div class="quote-form-icon">
+                            <i class="fas fa-file-invoice-dollar"></i>
+                        </div>
+                        <div class="quote-form-title">
+                            <h4>Müşteri Teklif Bilgileri</h4>
+                            <p>Aşağıdaki formdan müşteri için hazırlanan teklif bilgilerini kaydedin</p>
+                        </div>
+                    </div>
+                    
+                    <form id="quote-form" method="post" class="modern-form-container">
                         <?php wp_nonce_field('update_customer_quote', 'quote_nonce'); ?>
                         <input type="hidden" name="customer_id" value="<?php echo $customer->id; ?>">
                         <input type="hidden" name="action" value="update_quote_status">
                         
-                        <div class="ab-form-row">
-                            <div class="ab-form-group">
-                                <label for="offer_insurance_type">Sigorta Türü *</label>
-                                <select name="offer_insurance_type" id="offer_insurance_type" class="ab-input" required>
-                                    <option value="">Seçiniz...</option>
-                                    <option value="TSS">TSS (Tamamlayıcı Sağlık Sigortası)</option>
-                                    <option value="Kasko">Kasko</option>
-                                    <option value="Trafik">Trafik</option>
-                                    <option value="Konut">Konut</option>
-                                    <option value="İşyeri">İşyeri</option>
-                                    <option value="Hayat">Hayat</option>
-                                    <option value="Bireysel Emeklilik">Bireysel Emeklilik</option>
-                                    <option value="Diğer">Diğer</option>
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="offer_insurance_type" class="modern-label">
+                                    <i class="fas fa-shield-alt"></i>
+                                    <span>Sigorta Türü *</span>
+                                </label>
+                                <select name="offer_insurance_type" id="offer_insurance_type" class="modern-input modern-select" required>
+                                    <option value="">Lütfen sigorta türünüzü seçiniz</option>
+                                    <option value="TSS">🏥 TSS (Tamamlayıcı Sağlık Sigortası)</option>
+                                    <option value="Kasko">🚗 Kasko</option>
+                                    <option value="Trafik">🚦 Trafik</option>
+                                    <option value="Konut">🏠 Konut</option>
+                                    <option value="İşyeri">🏢 İşyeri</option>
+                                    <option value="Hayat">👤 Hayat</option>
+                                    <option value="Bireysel Emeklilik">💰 Bireysel Emeklilik</option>
+                                    <option value="Diğer">📋 Diğer</option>
                                 </select>
                             </div>
-                            <div class="ab-form-group">
-                                <label for="offer_amount">Teklif Tutarı (₺) *</label>
-                                <input type="number" name="offer_amount" id="offer_amount" class="ab-input" 
-                                       step="0.01" min="0" required placeholder="Teklif tutarını giriniz">
+                            
+                            <div class="form-field">
+                                <label for="offer_amount" class="modern-label">
+                                    <i class="fas fa-lira-sign"></i>
+                                    <span>Teklif Tutarı (₺) *</span>
+                                </label>
+                                <input type="number" name="offer_amount" id="offer_amount" class="modern-input" 
+                                       step="0.01" min="0" required placeholder="0,00" 
+                                       title="Teklif tutarını Turkish Lirası olarak giriniz">
                             </div>
                         </div>
                         
-                        <div class="ab-form-row">
-                            <div class="ab-form-group">
-                                <label for="offer_expiry_date">Geçerlilik Tarihi</label>
-                                <input type="date" name="offer_expiry_date" id="offer_expiry_date" class="ab-input" 
-                                       value="<?php echo date('Y-m-d', strtotime('+30 days')); ?>">
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="offer_expiry_date" class="modern-label">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <span>Geçerlilik Tarihi</span>
+                                </label>
+                                <input type="date" name="offer_expiry_date" id="offer_expiry_date" class="modern-input" 
+                                       value="<?php echo date('Y-m-d', strtotime('+30 days')); ?>"
+                                       title="Teklifin geçerli olacağı son tarihi seçiniz">
                             </div>
-                            <div class="ab-form-group">
-                                <label for="offer_reminder">Hatırlatma</label>
-                                <select name="offer_reminder" id="offer_reminder" class="ab-input">
-                                    <option value="0">Hayır</option>
-                                    <option value="1" selected>Evet (Vade Tarihinden 1 Gün Önce)</option>
+                            
+                            <div class="form-field">
+                                <label for="offer_reminder" class="modern-label">
+                                    <i class="fas fa-bell"></i>
+                                    <span>Hatırlatma</span>
+                                </label>
+                                <select name="offer_reminder" id="offer_reminder" class="modern-input modern-select">
+                                    <option value="0">🔕 Hayır</option>
+                                    <option value="1" selected>🔔 Evet (Vade Tarihinden 1 Gün Önce)</option>
                                 </select>
                             </div>
                         </div>
                         
-                        <div class="ab-form-row">
-                            <div class="ab-form-group">
-                                <label for="offer_notes">Teklif Notları</label>
-                                <textarea name="offer_notes" id="offer_notes" class="ab-input" rows="3" 
-                                          placeholder="Teklif ile ilgili notlarınızı giriniz..."></textarea>
-                            </div>
+                        <div class="form-field full-width">
+                            <label for="offer_notes" class="modern-label">
+                                <i class="fas fa-sticky-note"></i>
+                                <span>Teklif Notları</span>
+                            </label>
+                            <textarea name="offer_notes" id="offer_notes" class="modern-input modern-textarea" rows="4" 
+                                      placeholder="Teklif ile ilgili detayları, özel koşulları veya müşteriyle yapılan görüşme notlarını buraya yazabilirsiniz..."></textarea>
                         </div>
                         
-                        <div class="ab-form-actions">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Teklif Bilgilerini Kaydet
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-large">
+                                <i class="fas fa-save"></i>
+                                <span>Teklif Bilgilerini Kaydet</span>
                             </button>
-                            <button type="button" onclick="cancelQuoteForm()" class="btn btn-outline">
-                                <i class="fas fa-times"></i> İptal
+                            <button type="button" onclick="cancelQuoteForm()" class="btn btn-secondary btn-large">
+                                <i class="fas fa-times"></i>
+                                <span>İptal Et</span>
                             </button>
                         </div>
                     </form>
@@ -3944,6 +3972,227 @@ jQuery(document).ready(function($) {
     
     .insured-type {
         font-size: 9px;
+    }
+}
+</style>
+
+<style>
+/* Modern Quote Form Styles */
+.modern-quote-form {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 0;
+    margin-bottom: 30px;
+    box-shadow: 0 20px 40px rgba(102, 126, 234, 0.15);
+    overflow: hidden;
+    position: relative;
+}
+
+.modern-quote-form::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    pointer-events: none;
+}
+
+.quote-form-header {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 24px 30px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(10px);
+}
+
+.quote-form-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.quote-form-title h4 {
+    margin: 0 0 5px 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #2d3748;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.quote-form-title p {
+    margin: 0;
+    color: #718096;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.modern-form-container {
+    background: white;
+    padding: 30px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.form-field {
+    position: relative;
+}
+
+.form-field.full-width {
+    grid-column: 1 / -1;
+}
+
+.modern-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #4a5568;
+}
+
+.modern-label i {
+    color: #667eea;
+    width: 16px;
+    text-align: center;
+}
+
+.modern-input {
+    width: 100%;
+    padding: 14px 18px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 15px;
+    background: #fafafa;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+}
+
+.modern-input:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
+}
+
+.modern-input:hover {
+    border-color: #cbd5e0;
+    background: white;
+}
+
+.modern-select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+.modern-textarea {
+    resize: vertical;
+    min-height: 100px;
+    font-family: inherit;
+    line-height: 1.5;
+}
+
+.form-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: flex-end;
+    padding-top: 24px;
+    border-top: 1px solid #f1f5f9;
+    margin-top: 30px;
+}
+
+.btn-large {
+    padding: 16px 32px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+    min-width: 160px;
+    justify-content: center;
+}
+
+.btn-primary.btn-large {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary.btn-large:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary.btn-large {
+    background: #f8f9fa;
+    color: #495057;
+    border: 2px solid #e9ecef;
+}
+
+.btn-secondary.btn-large:hover {
+    background: #e9ecef;
+    transform: translateY(-1px);
+}
+
+/* Responsive Design for Quote Form */
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .quote-form-header {
+        padding: 20px;
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .quote-form-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    }
+    
+    .modern-form-container {
+        padding: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn-large {
+        width: 100%;
     }
 }
 </style>

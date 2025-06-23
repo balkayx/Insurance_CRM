@@ -768,38 +768,7 @@ function handle_customer_file_uploads($customer_id) {
     }
 }
 
-/**
- * Müşteri dosyasını siler
- */
-function delete_customer_file($file_id, $customer_id) {
-    global $wpdb;
-    $files_table = $wpdb->prefix . 'insurance_crm_customer_files';
-    
-    // Dosya bilgilerini al
-    $file = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $files_table WHERE id = %d AND customer_id = %d",
-        $file_id, $customer_id
-    ));
-    
-    if (!$file) {
-        return false;
-    }
-    
-    // Dosyayı fiziksel olarak sil
-    $upload_dir = wp_upload_dir();
-    $file_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $file->file_path);
-    if (file_exists($file_path)) {
-        unlink($file_path);
-    }
-    
-    // Veritabanından dosya kaydını sil
-    $wpdb->delete(
-        $files_table,
-        array('id' => $file_id)
-    );
-    
-    return true;
-}
+// Note: delete_customer_file function is defined in customers-view.php to avoid redeclaration
 
 // Dosya türüne göre ikon belirleme
 function get_file_icon($file_type) {
