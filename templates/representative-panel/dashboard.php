@@ -1304,14 +1304,14 @@ if ($current_view == 'search' && isset($_GET['keyword']) && !empty(trim($_GET['k
             WHERE c.representative_id IN ($placeholders)
             AND (
                 CONCAT(TRIM(c.first_name), ' ', TRIM(c.last_name)) LIKE %s
-                OR TRIM(c.tc_identity) LIKE %s
-                OR TRIM(c.spouse_name) LIKE %s
-                OR TRIM(c.spouse_tc_identity) LIKE %s
-                OR TRIM(c.children_names) LIKE %s
-                OR TRIM(c.children_tc_identities) LIKE %s
-                OR TRIM(c.company_name) LIKE %s
-                OR TRIM(c.tax_number) LIKE %s
-                OR TRIM(p.policy_number) LIKE %s
+                OR TRIM(COALESCE(c.tc_identity, '')) LIKE %s
+                OR TRIM(COALESCE(c.spouse_name, '')) LIKE %s
+                OR TRIM(COALESCE(c.spouse_tc_identity, '')) LIKE %s
+                OR TRIM(COALESCE(c.children_names, '')) LIKE %s
+                OR TRIM(COALESCE(c.children_tc_identities, '')) LIKE %s
+                OR TRIM(COALESCE(c.company_name, '')) LIKE %s
+                OR TRIM(COALESCE(c.tax_number, '')) LIKE %s
+                OR TRIM(COALESCE(p.policy_number, '')) LIKE %s
             )
             GROUP BY c.id
             ORDER BY c.first_name ASC

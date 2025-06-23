@@ -116,6 +116,7 @@ $offer_amount = isset($_GET['offer_amount']) ? floatval($_GET['offer_amount']) :
 $offer_type = isset($_GET['offer_type']) ? sanitize_text_field(urldecode($_GET['offer_type'])) : '';
 $offer_file_id = isset($_GET['file_id']) ? intval($_GET['file_id']) : 0;
 $selected_customer_id = isset($_GET['customer_id']) ? intval($_GET['customer_id']) : 0;
+$customer_search_value = isset($_GET['customer_search']) ? sanitize_text_field(urldecode($_GET['customer_search'])) : '';
 
 // Oturum açmış temsilcinin ID'sini al
 $current_user_rep_id = function_exists('get_current_user_rep_id') ? get_current_user_rep_id() : 0;
@@ -1455,8 +1456,12 @@ if ($user_role == 1 || $user_role == 2):
                                     <input type="text" id="customer_search" class="ab-input" 
                                            placeholder="Ad soyad, TC kimlik no, şirket adı veya vergi no ile arayın..."
                                            value="<?php 
+                                           // URL'den gelen customer_search parametresi öncelik
+                                           if (!empty($customer_search_value)) {
+                                               echo esc_attr($customer_search_value);
+                                           }
                                            // Sadece düzenleme, iptal, yenileme veya tekliften oluşturma modlarında müşteri adını göster
-                                           if (($editing || $cancelling || $renewing || $create_from_offer) && isset($customer) && $customer) {
+                                           elseif (($editing || $cancelling || $renewing || $create_from_offer) && isset($customer) && $customer) {
                                                echo esc_attr($customer->first_name . ' ' . $customer->last_name);
                                            } else {
                                                echo ''; // Yeni poliçe modunda boş bırak
@@ -1850,6 +1855,13 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✏️ Düzenleme/İptal modunda - Tüm bölümler gösteriliyor');
         showPolicyDetailsSteps();
         setupExistingFunctionality();
+        
+        // Müşteri bilgilerini ve aile üyelerini otomatik yükle
+        const customerId = document.getElementById('selected_customer_id').value;
+        if (customerId) {
+            console.log('📋 Düzenleme modunda müşteri verileri yükleniyor, ID:', customerId);
+            setupExistingCustomerData(customerId);
+        }
         return;
     }
     
@@ -1866,6 +1878,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Etkileşimli akış ve mevcut işlevsellik
         setupInteractiveFlow();
         setupExistingFunctionality();
+        
+        // Müşteri bilgilerini ve aile üyelerini otomatik yükle
+        const customerId = document.getElementById('selected_customer_id').value;
+        if (customerId) {
+            console.log('📋 Yenileme modunda müşteri verileri yükleniyor, ID:', customerId);
+            setupExistingCustomerData(customerId);
+        }
         return;
     }
     
@@ -1890,7 +1909,40 @@ document.addEventListener('DOMContentLoaded', function() {
     // Yeni ekleme modunda etkileşimli akış
     setupInteractiveFlow();
     setupExistingFunctionality();
+    
+    // URL'den customer_search parametresi varsa otomatik arama başlat
+    const customerSearchValue = document.getElementById('customer_search').value;
+    if (customerSearchValue && customerSearchValue.trim() !== '') {
+        console.log('🔍 URL parametresinden müşteri aranıyor:', customerSearchValue);
+        setTimeout(() => {
+            searchCustomers(customerSearchValue.trim());
+        }, 100);
+    }
 });
+
+// Düzenleme/yenileme modunda mevcut müşteri verilerini kurulum
+function setupExistingCustomerData(customerId) {
+    console.log('🔧 Mevcut müşteri verileri kuruluyor, ID:', customerId);
+    
+    // UI elementlerini göster
+    const selectedCustomerDetails = document.getElementById('selected_customer_details');
+    const insuredQuestion = document.getElementById('insured_question');
+    const familyMembersSelection = document.getElementById('family_members_selection');
+    
+    if (selectedCustomerDetails) selectedCustomerDetails.style.display = 'block';
+    if (insuredQuestion) insuredQuestion.style.display = 'block';
+    
+    // Müşteri verilerini yükle
+    loadExistingCustomerData(customerId);
+    
+    // Aile üyelerini yükle (düzenleme modunda da gerekli)
+    loadFamilyMembers(customerId);
+    
+    // Sigortalı seçimlerini geri yükle
+    setTimeout(() => {
+        restorePreviousInsuredSelections();
+    }, 500);
+}
 
 function setupInteractiveFlow() {
     console.log('🚀 Etkileşimli akış başlatılıyor...');
