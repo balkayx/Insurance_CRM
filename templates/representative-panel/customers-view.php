@@ -181,6 +181,43 @@ if (isset($_POST['action']) && $_POST['action'] === 'create_reminder_task' && is
     exit;
 }
 
+// Teklif durumu güncelleme işlemi
+if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && isset($_POST['customer_id'])) {
+    if (!wp_verify_nonce($_POST['quote_nonce'], 'update_customer_quote')) {
+        wp_die('Security check failed');
+    }
+    
+    $customer_id = intval($_POST['customer_id']);
+    $quote_data = array(
+        'has_offer' => 1,
+        'offer_insurance_type' => sanitize_text_field($_POST['offer_insurance_type']),
+        'offer_amount' => floatval($_POST['offer_amount']),
+        'offer_expiry_date' => sanitize_text_field($_POST['offer_expiry_date']),
+        'offer_reminder' => intval($_POST['offer_reminder']),
+        'offer_notes' => sanitize_textarea_field($_POST['offer_notes'])
+    );
+    
+    $result = $wpdb->update($customers_table, $quote_data, array('id' => $customer_id));
+    
+    if ($result !== false) {
+        // Create reminder task if requested
+        if ($quote_data['offer_reminder'] == 1 && !empty($quote_data['offer_expiry_date'])) {
+            if (!function_exists('create_offer_reminder_task')) {
+                require_once(dirname(__FILE__) . '/customers-form.php');
+            }
+            create_offer_reminder_task($customer_id, $quote_data);
+        }
+        
+        $_SESSION['crm_notice'] = '<div class="ab-notice ab-success">Teklif bilgileri başarıyla güncellendi.</div>';
+    } else {
+        $_SESSION['crm_notice'] = '<div class="ab-notice ab-error">Teklif bilgileri güncellenirken hata oluştu.</div>';
+    }
+    
+    // Sayfayı yenile
+    echo '<script>window.location.href = "?view=customers-view&id=' . $customer_id . '";</script>';
+    exit;
+}
+
 $customer_id = intval($_GET['id']);
 global $wpdb;
 $customers_table = $wpdb->prefix . 'insurance_crm_customers';
@@ -1140,16 +1177,23 @@ function format_file_size($size) {
                         <div class="ab-info-label">Teklif Durumu</div>
                         <div class="ab-info-value">
                             <?php 
-                            if (isset($customer->has_offer) && $customer->has_offer == 1) {
+                            $has_offer = isset($customer->has_offer) && $customer->has_offer == 1;
+                            if ($has_offer) {
                                 echo '<span class="ab-positive">Evet</span>';
+                                echo ' <button type="button" onclick="toggleOfferStatus(0)" class="btn-small btn-outline" title="Hayır olarak değiştir">
+                                        <i class="fas fa-edit"></i>
+                                      </button>';
                             } else {
                                 echo '<span class="ab-negative">Hayır</span>';
+                                echo ' <button type="button" onclick="toggleOfferStatus(1)" class="btn-small btn-primary" title="Evet olarak değiştir">
+                                        <i class="fas fa-plus"></i> Teklif Ver
+                                      </button>';
                             }
                             ?>
                         </div>
                     </div>
                     
-                    <?php if (isset($customer->has_offer) && $customer->has_offer == 1): ?>
+                    <?php if ($has_offer): ?>
                     <div class="ab-info-item">
                         <div class="ab-info-label">Sigorta Tipi</div>
                         <div class="ab-info-value">
@@ -1169,6 +1213,72 @@ function format_file_size($size) {
                             ?>
                         </div>
                     </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Quote Form - Only show when toggling to offer status -->
+                <div id="quote-form-section" style="display: none;" class="ab-form-section">
+                    <h4><i class="fas fa-file-invoice"></i> Teklif Bilgileri</h4>
+                    <form id="quote-form" method="post">
+                        <?php wp_nonce_field('update_customer_quote', 'quote_nonce'); ?>
+                        <input type="hidden" name="customer_id" value="<?php echo $customer->id; ?>">
+                        <input type="hidden" name="action" value="update_quote_status">
+                        
+                        <div class="ab-form-row">
+                            <div class="ab-form-group">
+                                <label for="offer_insurance_type">Sigorta Türü *</label>
+                                <select name="offer_insurance_type" id="offer_insurance_type" class="ab-input" required>
+                                    <option value="">Seçiniz...</option>
+                                    <option value="TSS">TSS (Tamamlayıcı Sağlık Sigortası)</option>
+                                    <option value="Kasko">Kasko</option>
+                                    <option value="Trafik">Trafik</option>
+                                    <option value="Konut">Konut</option>
+                                    <option value="İşyeri">İşyeri</option>
+                                    <option value="Hayat">Hayat</option>
+                                    <option value="Bireysel Emeklilik">Bireysel Emeklilik</option>
+                                    <option value="Diğer">Diğer</option>
+                                </select>
+                            </div>
+                            <div class="ab-form-group">
+                                <label for="offer_amount">Teklif Tutarı (₺) *</label>
+                                <input type="number" name="offer_amount" id="offer_amount" class="ab-input" 
+                                       step="0.01" min="0" required placeholder="Teklif tutarını giriniz">
+                            </div>
+                        </div>
+                        
+                        <div class="ab-form-row">
+                            <div class="ab-form-group">
+                                <label for="offer_expiry_date">Geçerlilik Tarihi</label>
+                                <input type="date" name="offer_expiry_date" id="offer_expiry_date" class="ab-input" 
+                                       value="<?php echo date('Y-m-d', strtotime('+30 days')); ?>">
+                            </div>
+                            <div class="ab-form-group">
+                                <label for="offer_reminder">Hatırlatma</label>
+                                <select name="offer_reminder" id="offer_reminder" class="ab-input">
+                                    <option value="0">Hayır</option>
+                                    <option value="1" selected>Evet (Vade Tarihinden 1 Gün Önce)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="ab-form-row">
+                            <div class="ab-form-group">
+                                <label for="offer_notes">Teklif Notları</label>
+                                <textarea name="offer_notes" id="offer_notes" class="ab-input" rows="3" 
+                                          placeholder="Teklif ile ilgili notlarınızı giriniz..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="ab-form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Teklif Bilgilerini Kaydet
+                            </button>
+                            <button type="button" onclick="cancelQuoteForm()" class="btn btn-outline">
+                                <i class="fas fa-times"></i> İptal
+                            </button>
+                        </div>
+                    </form>
+                </div>
                     
                     <div class="ab-info-item">
                         <div class="ab-info-label">Teklif Vadesi</div>
@@ -3763,6 +3873,49 @@ jQuery(document).ready(function($) {
                     openModal('file-upload-modal');
                 });
             }
+        });
+    }
+    
+    // Quote toggle functionality
+    window.toggleOfferStatus = function(newStatus) {
+        if (newStatus === 1) {
+            // Show quote form
+            document.getElementById('quote-form-section').style.display = 'block';
+            document.getElementById('quote-form-section').scrollIntoView({ behavior: 'smooth' });
+        } else {
+            // Change status to No without showing form
+            if (confirm('Teklif durumunu "Hayır" olarak değiştirmek istediğinizden emin misiniz?')) {
+                updateOfferStatusDirectly(0);
+            }
+        }
+    };
+    
+    window.cancelQuoteForm = function() {
+        document.getElementById('quote-form-section').style.display = 'none';
+    };
+    
+    function updateOfferStatusDirectly(status) {
+        const formData = new FormData();
+        formData.append('action', 'toggle_offer_status');
+        formData.append('customer_id', '<?php echo $customer->id; ?>');
+        formData.append('has_offer', status);
+        formData.append('nonce', '<?php echo wp_create_nonce("toggle_offer_status"); ?>');
+        
+        fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Hata: ' + (data.data || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Bir hata oluştu: ' + error.message);
         });
     }
     

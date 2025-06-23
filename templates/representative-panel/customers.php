@@ -281,7 +281,16 @@ $per_page = 15;
 $offset = ($current_page - 1) * $per_page;
 
 // FİLTRELEME PARAMETRELERİ - Düzeltilmiş
+$customer_name_filter = isset($_GET['customer_name']) ? sanitize_text_field($_GET['customer_name']) : '';
+$company_name_filter = isset($_GET['company_name']) ? sanitize_text_field($_GET['company_name']) : '';
+$tc_identity_filter = isset($_GET['tc_identity']) ? sanitize_text_field($_GET['tc_identity']) : '';  
+$tax_number_filter = isset($_GET['tax_number']) ? sanitize_text_field($_GET['tax_number']) : '';
+
+// Legacy support for old search parameter
 $search = isset($_GET['customer_name']) ? sanitize_text_field($_GET['customer_name']) : '';
+if (empty($search) && !empty($customer_name_filter)) {
+    $search = $customer_name_filter;
+}
 
 $status_filter = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
 $category_filter = isset($_GET['category']) ? sanitize_text_field($_GET['category']) : '';
@@ -346,8 +355,34 @@ elseif ($access_level == 'ekip_lideri') {
 
 // Patron, Müdür ve Müdür Yardımcısı tüm müşterileri görebilir (ek filtreleme yok)
 
-// Arama filtresi - Müşteri adı ile arama
-if (!empty($search)) {
+// Arama filtreleri - Ayrı alanlar için
+if (!empty($customer_name_filter)) {
+    $base_query .= $wpdb->prepare(
+        " AND (
+            c.first_name LIKE %s 
+            OR c.last_name LIKE %s 
+            OR CONCAT(c.first_name, ' ', c.last_name) LIKE %s
+        )",
+        '%' . $wpdb->esc_like($customer_name_filter) . '%',
+        '%' . $wpdb->esc_like($customer_name_filter) . '%',
+        '%' . $wpdb->esc_like($customer_name_filter) . '%'
+    );
+}
+
+if (!empty($company_name_filter)) {
+    $base_query .= $wpdb->prepare(" AND c.company_name LIKE %s", '%' . $wpdb->esc_like($company_name_filter) . '%');
+}
+
+if (!empty($tc_identity_filter)) {
+    $base_query .= $wpdb->prepare(" AND c.tc_identity = %s", $tc_identity_filter);
+}
+
+if (!empty($tax_number_filter)) {
+    $base_query .= $wpdb->prepare(" AND c.tax_number = %s", $tax_number_filter);
+}
+
+// Legacy search support - Müşteri adı ile arama
+if (!empty($search) && empty($customer_name_filter)) {
     $base_query .= $wpdb->prepare(
         " AND (
             c.first_name LIKE %s 
@@ -796,24 +831,31 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
                 
                 <div class="filters-grid">
                     <div class="filter-group">
-                        <label for="filter_search">Müşteri Adı / Firma Adı</label>
-                        <input type="text" id="filter_search" name="customer_name" 
-                               value="<?php echo esc_attr($search); ?>" 
-                               placeholder="Müşteri Ad Soyad veya Kurumsal Firma Adı..." class="form-input">
+                        <label for="customer_name">Müşteri Adı</label>
+                        <input type="text" id="customer_name" name="customer_name" 
+                               value="<?php echo esc_attr($customer_name_filter); ?>" 
+                               placeholder="Müşteri Ad Soyad..." class="form-input">
                     </div>
 
                     <div class="filter-group">
-                        <label for="filter_customer_tc">TC Kimlik No / VKN</label>
-                        <input type="text" id="filter_customer_tc" name="customer_tc" 
-                               value="<?php echo esc_attr($customer_tc_filter); ?>" 
-                               placeholder="TC Kimlik No veya VKN..." class="form-input">
+                        <label for="company_name">Firma Adı</label>
+                        <input type="text" id="company_name" name="company_name" 
+                               value="<?php echo esc_attr($company_name_filter); ?>" 
+                               placeholder="Kurumsal Firma Adı..." class="form-input">
                     </div>
 
                     <div class="filter-group">
-                        <label for="filter_customer_vkn">VKN ile Ara</label>
-                        <input type="text" id="filter_customer_vkn" name="customer_vkn" 
-                               value="<?php echo esc_attr($customer_vkn_filter); ?>" 
-                               placeholder="Vergi Kimlik Numarası ile ara..." class="form-input">
+                        <label for="tc_identity">TC Kimlik No</label>
+                        <input type="text" id="tc_identity" name="tc_identity" 
+                               value="<?php echo esc_attr($tc_identity_filter); ?>" 
+                               placeholder="TC Kimlik No..." class="form-input">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="tax_number">VKN</label>
+                        <input type="text" id="tax_number" name="tax_number" 
+                               value="<?php echo esc_attr($tax_number_filter); ?>" 
+                               placeholder="Vergi Kimlik Numarası..." class="form-input">
                     </div>
 
                     <div class="filter-group">
@@ -949,6 +991,10 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
                         <i class="fas fa-undo"></i>
                         <span>Sıfırla</span>
                     </a>
+                    <button type="button" onclick="fixAllNames()" class="btn btn-warning">
+                        <i class="fas fa-text-height"></i>
+                        <span>İSİMLERİ DÜZELT</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -3876,6 +3922,45 @@ class ModernCustomersApp {
         console.log('  ✓ Responsive tasarım korundu');
         console.log('🎯 Sistem üretim için hazır ve tamamen işlevsel');
     }
+}
+
+// Name fixing functionality
+function fixAllNames() {
+    if (!confirm('Tüm müşteri isimlerini düzeltmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
+        return;
+    }
+    
+    const fixBtn = document.querySelector('button[onclick="fixAllNames()"]');
+    const originalText = fixBtn.innerHTML;
+    fixBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>İşleniyor...</span>';
+    fixBtn.disabled = true;
+    
+    // AJAX request to fix names
+    const formData = new FormData();
+    formData.append('action', 'fix_all_names');
+    formData.append('nonce', '<?php echo wp_create_nonce("fix_names_nonce"); ?>');
+    
+    fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('İsimler başarıyla düzeltildi! ' + data.data.fixed_count + ' kayıt güncellendi.');
+            window.location.reload();
+        } else {
+            alert('Hata: ' + (data.data || 'Bilinmeyen hata'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu: ' + error.message);
+    })
+    .finally(() => {
+        fixBtn.innerHTML = originalText;
+        fixBtn.disabled = false;
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {

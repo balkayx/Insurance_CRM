@@ -600,19 +600,37 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
                                 Müşteri <span class="required">*</span>
                             </label>
                             
-                            <div class="customer-selector">
-                                <select name="customer_id" id="customer_dropdown" class="form-select" required>
-                                    <option value="">Müşteri Seçin</option>
-                                    <?php foreach ($all_customers as $id => $name): ?>
-                                        <option value="<?php echo esc_attr($id); ?>" <?php selected($selected_customer_id, $id); ?>>
-                                            <?php echo esc_html($name); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <p class="input-help">
-                                    <i class="fas fa-info-circle"></i> 
-                                    Çok fazla müşteri varsa, tarayıcınızın arama özelliğini kullanabilirsiniz (Ctrl+F).
-                                </p>
+                            <div class="customer-search-section">
+                                <!-- Customer Search -->
+                                <div class="customer-search-container">
+                                    <input type="text" id="customer_search" class="form-input" 
+                                           placeholder="Müşteri adı, TC kimlik no, telefon ile arama...">
+                                    <button type="button" id="search_customer_btn" class="btn btn-primary">
+                                        <i class="fas fa-search"></i> Ara
+                                    </button>
+                                </div>
+                                
+                                <!-- Search Results -->
+                                <div id="customer_search_results" class="search-results" style="display: none;"></div>
+                                
+                                <!-- Selected Customer Display -->
+                                <div id="selected_customer_display" class="selected-customer" style="display: none;">
+                                    <div class="selected-customer-info">
+                                        <div class="customer-avatar">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                        <div class="customer-details">
+                                            <div class="customer-name"></div>
+                                            <div class="customer-meta"></div>
+                                        </div>
+                                        <button type="button" class="btn btn-outline btn-sm" onclick="clearCustomerSelection()">
+                                            <i class="fas fa-times"></i> Değiştir
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Hidden input for selected customer -->
+                                <input type="hidden" name="customer_id" id="selected_customer_id" value="<?php echo $selected_customer_id; ?>">
                             </div>
                         </div>
                     </div>
@@ -954,8 +972,118 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
 }
 
 /* Müşteri Seçici */
-.customer-selector {
+.customer-search-section {
     position: relative;
+}
+
+.customer-search-container {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.customer-search-container input {
+    flex: 1;
+}
+
+.search-results {
+    background: var(--surface);
+    border: 1px solid var(--outline-variant);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: var(--spacing-md);
+}
+
+.search-result-item {
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--outline-variant);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.search-result-item:hover {
+    background: var(--surface-variant);
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-avatar {
+    width: 40px;
+    height: 40px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.search-result-info {
+    flex: 1;
+}
+
+.search-result-name {
+    font-weight: 600;
+    color: var(--on-surface);
+    margin-bottom: 2px;
+}
+
+.search-result-meta {
+    font-size: var(--font-size-sm);
+    color: var(--on-surface-variant);
+}
+
+.selected-customer {
+    background: var(--surface-variant);
+    border: 1px solid var(--outline);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+}
+
+.selected-customer-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.customer-avatar {
+    width: 48px;
+    height: 48px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+
+.customer-details {
+    flex: 1;
+}
+
+.customer-name {
+    font-weight: 600;
+    color: var(--on-surface);
+    margin-bottom: 2px;
+}
+
+.customer-meta {
+    font-size: var(--font-size-sm);
+    color: var(--on-surface-variant);
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: var(--font-size-sm);
 }
 
 .loading-indicator {
@@ -1346,7 +1474,11 @@ $form_action = $editing ? 'Güncelle' : 'Kaydet';
  */
 document.addEventListener('DOMContentLoaded', function() {
     // DOM elementleri
-    const customerDropdown = document.getElementById('customer_dropdown');
+    const customerSearchInput = document.getElementById('customer_search');
+    const searchCustomerBtn = document.getElementById('search_customer_btn');
+    const customerSearchResults = document.getElementById('customer_search_results');
+    const selectedCustomerDisplay = document.getElementById('selected_customer_display');
+    const selectedCustomerId = document.getElementById('selected_customer_id');
     const policiesContainer = document.getElementById('customer-policies-container');
     const prioritySelect = document.getElementById('priority');
     const taskForm = document.querySelector('.modern-form');
@@ -1354,6 +1486,137 @@ document.addEventListener('DOMContentLoaded', function() {
     // Müşteri ve poliçe verilerini al
     const customersData = JSON.parse(document.getElementById('customers-data').textContent);
     const policiesData = JSON.parse(document.getElementById('policies-data').textContent);
+
+    // Initialize customer selection if editing mode
+    if (selectedCustomerId && selectedCustomerId.value) {
+        const customerId = selectedCustomerId.value;
+        const customerData = customersData.find(c => c.id == customerId);
+        if (customerData) {
+            displaySelectedCustomer({
+                id: customerData.id,
+                name: customerData.first_name + ' ' + customerData.last_name,
+                tc_vkn: customerData.tc_kimlik_no || 'Belirtilmemiş',
+                phone: customerData.phone || 'Belirtilmemiş',
+                is_company: false
+            });
+            loadCustomerPolicies(customerId);
+        }
+    }
+    
+    // Customer search functionality
+    if (searchCustomerBtn && customerSearchInput) {
+        searchCustomerBtn.addEventListener('click', performCustomerSearch);
+        customerSearchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performCustomerSearch();
+            }
+        });
+    }
+    
+    function performCustomerSearch() {
+        const searchTerm = customerSearchInput.value.trim();
+        if (searchTerm.length < 2) {
+            alert('En az 2 karakter giriniz.');
+            return;
+        }
+        
+        // Show loading
+        customerSearchResults.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><span>Aranıyor...</span></div>';
+        customerSearchResults.style.display = 'block';
+        
+        // Create search request
+        const formData = new FormData();
+        formData.append('action', 'search_customers_for_task');
+        formData.append('search_term', searchTerm);
+        formData.append('nonce', '<?php echo wp_create_nonce("customer_search"); ?>');
+        
+        fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displaySearchResults(data.data);
+            } else {
+                customerSearchResults.innerHTML = '<div class="search-no-results">Müşteri bulunamadı.</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Search error:', error);
+            customerSearchResults.innerHTML = '<div class="search-error">Arama sırasında hata oluştu.</div>';
+        });
+    }
+    
+    function displaySearchResults(customers) {
+        if (!customers || customers.length === 0) {
+            customerSearchResults.innerHTML = '<div class="search-no-results">Müşteri bulunamadı.</div>';
+            return;
+        }
+        
+        let html = '';
+        customers.forEach(customer => {
+            const displayName = customer.company_name || (customer.first_name + ' ' + customer.last_name);
+            const tcVkn = customer.tax_number || customer.tc_identity || 'Belirtilmemiş';
+            const phone = customer.phone || 'Belirtilmemiş';
+            
+            html += `
+                <div class="search-result-item" onclick="selectCustomer(${customer.id}, '${displayName}', '${tcVkn}', '${phone}', '${customer.company_name || ''}')">
+                    <div class="search-result-avatar">
+                        <i class="fas fa-${customer.company_name ? 'building' : 'user'}"></i>
+                    </div>
+                    <div class="search-result-info">
+                        <div class="search-result-name">${displayName}</div>
+                        <div class="search-result-meta">
+                            ${customer.company_name ? 'VKN' : 'TC'}: ${tcVkn} | Tel: ${phone}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        customerSearchResults.innerHTML = html;
+    }
+    
+    window.selectCustomer = function(customerId, displayName, tcVkn, phone, companyName) {
+        const customerData = {
+            id: customerId,
+            name: displayName,
+            tc_vkn: tcVkn,
+            phone: phone,
+            is_company: !!companyName
+        };
+        
+        selectedCustomerId.value = customerId;
+        displaySelectedCustomer(customerData);
+        customerSearchResults.style.display = 'none';
+        customerSearchInput.value = '';
+        
+        // Load customer policies
+        loadCustomerPolicies(customerId);
+    };
+    
+    function displaySelectedCustomer(customerData) {
+        const nameEl = selectedCustomerDisplay.querySelector('.customer-name');
+        const metaEl = selectedCustomerDisplay.querySelector('.customer-meta');
+        const avatarEl = selectedCustomerDisplay.querySelector('.customer-avatar i');
+        
+        nameEl.textContent = customerData.name;
+        metaEl.textContent = `${customerData.is_company ? 'VKN' : 'TC'}: ${customerData.tc_vkn} | Tel: ${customerData.phone}`;
+        avatarEl.className = `fas fa-${customerData.is_company ? 'building' : 'user'}`;
+        
+        selectedCustomerDisplay.style.display = 'block';
+        customerSearchResults.style.display = 'none';
+    }
+    
+    window.clearCustomerSelection = function() {
+        selectedCustomerId.value = '';
+        selectedCustomerDisplay.style.display = 'none';
+        policiesContainer.style.display = 'none';
+        policiesContainer.innerHTML = '';
+        customerSearchInput.value = '';
+    };
 
     // Bildirim kapatma
     document.querySelectorAll('.notification-close').forEach(button => {

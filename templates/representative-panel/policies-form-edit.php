@@ -85,7 +85,8 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
     if ($cancelling) {
         $policy_data['status'] = 'iptal';
         $policy_data['cancellation_reason'] = isset($_POST['cancellation_reason']) ? sanitize_text_field($_POST['cancellation_reason']) : '';
-        $policy_data['cancellation_date'] = current_time('mysql');
+        $policy_data['cancellation_date'] = isset($_POST['cancellation_date']) ? sanitize_text_field($_POST['cancellation_date']) : current_time('mysql');
+        $policy_data['refund_amount'] = isset($_POST['refund_amount']) && !empty($_POST['refund_amount']) ? floatval($_POST['refund_amount']) : null;
     }
     
     if (in_array(strtolower($policy_data['policy_type']), ['kasko', 'trafik']) && isset($_POST['plate_number'])) {
@@ -368,18 +369,48 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
                             <option value="iptal" <?php selected($cancelling ? 'iptal' : $policy->status, 'iptal'); ?>>İptal</option>
                         </select>
                     </div>
-                    <?php if ($cancelling): ?>
+                </div>
+            </div>
+
+            <!-- Cancellation Details - Only show when cancelling -->
+            <?php if ($cancelling): ?>
+            <div class="ab-form-section ab-form-section-warning">
+                <h3><i class="fas fa-exclamation-triangle"></i> İptal Bilgileri</h3>
+                <div class="ab-form-warning">
+                    <div class="ab-warning-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="ab-warning-content">
+                        <strong>Dikkat:</strong> İptal işlemi geri alınamaz. İptal edilen poliçeler sistemde kalacak ancak Zeyil olarak işaretlenecektir.
+                    </div>
+                </div>
+                <div class="ab-form-row">
+                    <div class="ab-form-group">
+                        <label for="cancellation_date">İptal Tarihi *</label>
+                        <input type="date" name="cancellation_date" id="cancellation_date" class="ab-input" 
+                               value="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
                     <div class="ab-form-group">
                         <label for="cancellation_reason">İptal Nedeni *</label>
                         <select name="cancellation_reason" id="cancellation_reason" class="ab-input" required>
                             <option value="">Seçiniz...</option>
-                            <?php foreach ($cancellation_reasons as $reason): ?>
-                            <option value="<?php echo esc_attr($reason); ?>"><?php echo esc_html($reason); ?></option>
-                            <?php endforeach; ?>
+                            <option value="Araç Satışı">Araç Satışı</option>
+                            <option value="İsteğe Bağlı">İsteğe Bağlı</option>
+                            <option value="Tahsilattan İptal">Tahsilattan İptal</option>
+                            <option value="Diğer Nedenler">Diğer Nedenler</option>
                         </select>
                     </div>
-                    <?php endif; ?>
                 </div>
+                <div class="ab-form-row">
+                    <div class="ab-form-group">
+                        <label for="refund_amount">İade Tutarı (₺)</label>
+                        <input type="number" name="refund_amount" id="refund_amount" class="ab-input" 
+                               step="0.01" min="0" placeholder="Varsa iade tutarını giriniz">
+                        <small class="ab-form-help">İade edilecek tutar varsa giriniz. Boş bırakılabilir.</small>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
             </div>
 
             <!-- Payment Information -->
@@ -583,6 +614,39 @@ document.addEventListener('DOMContentLoaded', function() {
     box-shadow: var(--shadow-md);
     margin-bottom: var(--spacing-lg);
     overflow: hidden;
+}
+
+.ab-form-section-warning {
+    border-left: 4px solid var(--color-warning);
+}
+
+.ab-form-warning {
+    background: var(--color-warning-light);
+    border: 1px solid var(--color-warning);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin: var(--spacing-md) var(--spacing-lg);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+}
+
+.ab-warning-icon {
+    color: var(--color-warning);
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.ab-warning-content {
+    color: var(--color-text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.ab-warning-content strong {
+    font-weight: 700;
+    color: var(--color-warning);
 }
 
 .ab-form-section h3 {

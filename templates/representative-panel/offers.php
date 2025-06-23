@@ -2261,10 +2261,10 @@ if (function_exists('is_team_leader') && is_team_leader($current_user_id)) {
                                     </td>
                                     <td class="actions" data-label="İşlemler">
                                         <div class="action-buttons-group">
-                                            <a href="<?php echo get_panel_url('customers', 'view', $customer->id); ?>" class="btn btn-sm btn-info" title="Görüntüle">
+                                            <a href="?view=offer-view&id=<?php echo $customer->id; ?>" class="btn btn-sm btn-info" title="Teklif Detayı">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            <a href="<?php echo get_panel_url('policies', 'create_from_offer', $customer->id); ?>" class="btn btn-sm btn-success" title="Poliçeleştir">
+                                            <a href="?view=policies&action=new&customer_search=<?php echo urlencode($customer->first_name . ' ' . $customer->last_name); ?>&offer_type=<?php echo urlencode($customer->offer_insurance_type); ?>&offer_amount=<?php echo urlencode($customer->offer_amount); ?>" class="btn btn-sm btn-success" title="Poliçeye Çevir">
                                                 <i class="fas fa-exchange-alt"></i>
                                             </a>
                                         </div>
