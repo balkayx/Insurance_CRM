@@ -1602,15 +1602,8 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
                                 <td class="customer-name" data-label="Müşteri">
                                     <a href="?view=<?php echo esc_attr($view_type); ?>&action=view&id=<?php echo $customer->id; ?>" class="customer-link">
                                         <?php 
-                                        // Proper Turkish uppercase conversion
-                                        $customer_name = mb_strtoupper($customer->customer_name, 'UTF-8');
-                                        // Convert specific Turkish characters to proper uppercase
-                                        $customer_name = str_replace(
-                                            ['ı', 'i', 'İ'],
-                                            ['I', 'İ', 'İ'],
-                                            $customer_name
-                                        );
-                                        echo esc_html($customer_name); 
+                                        // Display name as stored in database
+                                        echo esc_html($customer->customer_name); 
                                         ?>
                                     </a>
                                     <?php if (!empty($customer->company_name)): ?>

@@ -143,7 +143,16 @@ if (empty($users)) {
     }
 }
 
+// Müşterileri çek
+$customers = $wpdb->get_results("
+    SELECT id, customer_name, first_name, last_name, tc_identity, phone, customer_type, company_name 
+    FROM {$wpdb->prefix}insurance_crm_customers 
+    WHERE status = 'aktif' 
+    ORDER BY customer_name ASC
+");
+
 error_log("Task form - Found " . count($users) . " assignable users");
+error_log("Task form - Found " . count($customers) . " customers");
 ?>
 
 <style>
@@ -239,48 +248,6 @@ error_log("Task form - Found " . count($users) . " assignable users");
     .ab-textarea {
         min-height: 100px;
         resize: vertical;
-    }
-
-    .customer-search-container {
-        position: relative;
-        margin-bottom: 20px;
-    }
-
-    .customer-search-input {
-        width: 100%;
-        padding: 12px;
-        border: 2px solid #e9ecef;
-        border-radius: 6px;
-        font-size: 14px;
-    }
-
-    .customer-search-results {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        max-height: 300px;
-        overflow-y: auto;
-        z-index: 1000;
-        display: none;
-    }
-
-    .customer-search-item {
-        padding: 12px;
-        cursor: pointer;
-        border-bottom: 1px solid #eee;
-        transition: background-color 0.2s;
-    }
-
-    .customer-search-item:hover {
-        background-color: #f8f9fa;
-    }
-
-    .customer-search-item:last-child {
-        border-bottom: none;
     }
 
     .selected-customer {
@@ -524,11 +491,31 @@ error_log("Task form - Found " . count($users) . " assignable users");
                 Önce görevi ilişkilendireceğiniz müşteriyi seçin
             </div>
             
-            <div class="customer-search-container">
-                <input type="text" id="customerSearch" class="customer-search-input" 
-                       placeholder="Müşteri adı, TC kimlik no, telefon ile arayın..." 
-                       autocomplete="off">
-                <div id="customerSearchResults" class="customer-search-results"></div>
+            <div class="ab-form-group">
+                <label for="customer_select" class="required">Müşteri Seçimi</label>
+                <select name="customer_select" id="customer_select" class="ab-select" required>
+                    <option value="">Müşteri Seçiniz...</option>
+                    <?php foreach ($customers as $customer): ?>
+                        <?php 
+                        $display_name = !empty($customer->customer_name) ? $customer->customer_name : $customer->first_name . ' ' . $customer->last_name;
+                        if ($customer->customer_type === 'kurumsal' && !empty($customer->company_name)) {
+                            $display_name = $customer->company_name;
+                        }
+                        ?>
+                        <option value="<?php echo esc_attr($customer->id); ?>" 
+                                data-type="<?php echo esc_attr($customer->customer_type); ?>"
+                                data-name="<?php echo esc_attr($display_name); ?>">
+                            <?php echo esc_html($display_name); ?> 
+                            (<?php echo esc_html($customer->customer_type === 'kurumsal' ? 'Kurumsal' : 'Bireysel'); ?>)
+                            <?php if (!empty($customer->tc_identity)): ?>
+                                - TC: <?php echo esc_html($customer->tc_identity); ?>
+                            <?php endif; ?>
+                            <?php if (!empty($customer->phone)): ?>
+                                - Tel: <?php echo esc_html($customer->phone); ?>
+                            <?php endif; ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <div id="selectedCustomerInfo" class="selected-customer" style="display: none;">
@@ -620,26 +607,22 @@ error_log("Task form - Found " . count($users) . " assignable users");
 <script>
 const ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
 jQuery(document).ready(function($) {
-    let searchTimeout;
     let selectedCustomer = null;
     
-    // Müşteri arama
-    $('#customerSearch').on('input', function() {
-        const searchTerm = $(this).val().trim();
-        console.log('🔤 Input değişti:', searchTerm, 'Uzunluk:', searchTerm.length);
+    // Müşteri seçimi dropdown
+    $('#customer_select').on('change', function() {
+        const customerId = $(this).val();
+        const selectedOption = $(this).find('option:selected');
+        const customerName = selectedOption.data('name');
+        const customerType = selectedOption.data('type');
         
-        clearTimeout(searchTimeout);
+        console.log('Müşteri seçildi:', customerId, customerName, customerType);
         
-        if (searchTerm.length < 2) {
-            $('#customerSearchResults').hide();
-            console.log('👋 Arama çok kısa, sonuçlar gizlendi');
-            return;
+        if (customerId && customerName) {
+            selectCustomer(customerId, customerName, customerType);
+        } else {
+            clearCustomerSelection();
         }
-        
-        console.log('⏰ Arama timeout ayarlandı');
-        searchTimeout = setTimeout(function() {
-            searchCustomers(searchTerm);
-        }, 500);
     });
     
     function searchCustomers(term) {

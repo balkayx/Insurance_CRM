@@ -1695,56 +1695,46 @@ function format_file_size($size) {
     color: #333;
 }
 
-/* Material Design Customer Header */
+/* Clean Customer Header */
 .ab-customer-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 32px;
+    margin-bottom: 20px;
     flex-wrap: wrap;
-    gap: 24px;
-    padding: 24px;
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border-radius: 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.04);
+    gap: 15px;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
 }
 
 .ab-customer-title h1 {
-    font-size: 28px;
-    margin: 0 0 12px 0;
+    font-size: 22px;
+    margin: 0 0 8px 0;
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-weight: 700;
-    color: #1a1a1a;
-    letter-spacing: -0.02em;
+    gap: 8px;
+    font-weight: 600;
+    color: #333;
 }
 
 .ab-customer-title h1 i {
     color: #4caf50;
-    background: rgba(76, 175, 80, 0.1);
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .ab-customer-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
 }
 
 .ab-customer-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    padding : 20px;
+    gap: 8px;
     align-items: center;
 }
 
@@ -1759,122 +1749,29 @@ function format_file_size($size) {
     gap: 10px;
 }
 
-/* Material Design Panel Stilleri */
+/* Clean Panel Styles */
 .ab-panels {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
-    margin-bottom: 24px;
+    gap: 15px;
+    margin-bottom: 20px;
 }
 
 .ab-panel {
     background-color: #fff;
-    border-radius: 12px;
+    border-radius: 4px;
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.04);
-    transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-}
-
-.ab-panel::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--panel-color, #ddd), rgba(var(--panel-color-rgb, 221, 221, 221), 0.7));
-    border-radius: 12px 12px 0 0;
+    border: 1px solid #e0e0e0;
+    margin-bottom: 10px;
 }
 
 .ab-panel:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
-    transform: translateY(-2px);
+    border-color: #ccc;
 }
 
-/* Panel tiplerine göre renk şemaları, CSS değişkeni (--panel-color) kullanılır */
-.ab-panel-personal {
-    background-color: rgba(var(--panel-color-rgb, 52, 152, 219), 0.02);
-}
-.ab-panel-personal .ab-panel-header {
-    background-color: rgba(var(--panel-color-rgb, 52, 152, 219), 0.05);
-}
-.ab-panel-personal .ab-panel-header h3 i {
-    color: var(--panel-color, #3498db);
-}
-
-.ab-panel-corporate {
-    background-color: rgba(var(--panel-color-rgb, 76, 175, 80), 0.02);
-}
-.ab-panel-corporate .ab-panel-header {
-    background-color: rgba(var(--panel-color-rgb, 76, 175, 80), 0.05);
-}
-.ab-panel-corporate .ab-panel-header h3 i {
-    color: var(--panel-color, #4caf50);
-}
-
-.ab-panel-family {
-    background-color: rgba(var(--panel-color-rgb, 255, 152, 0), 0.02);
-}
-.ab-panel-family .ab-panel-header {
-    background-color: rgba(var(--panel-color-rgb, 255, 152, 0), 0.05);
-}
-.ab-panel-family .ab-panel-header h3 i {
-    color: var(--panel-color, #ff9800);
-}
-
-.ab-panel-vehicle {
-    background-color: rgba(var(--panel-color-rgb, 231, 76, 60), 0.02);
-}
-.ab-panel-vehicle .ab-panel-header {
-    background-color: rgba(var(--panel-color-rgb, 231, 76, 60), 0.05);
-}
-.ab-panel-vehicle .ab-panel-header h3 i {
-    color: var(--panel-color, #e74c3c);
-}
-
-.ab-panel-home {
-    background-color: rgba(var(--panel-color-rgb, 156, 39, 176), 0.02);
-}
-.ab-panel-home .ab-panel-header {
-    background-color: rgba(var(--panel-color-rgb, 156, 39, 176), 0.05);
-}
-.ab-panel-home .ab-panel-header h3 i {
-    color: var(--panel-color, #9c27b0);
-}
-
-/* Evcil Hayvan panel stili */
-.ab-panel-pet {
-    background-color: rgba(var(--panel-color-rgb, 233, 30, 99), 0.02);
-}
-.ab-panel-pet .ab-panel-header {
-    background-color: rgba(var(--panel-color-rgb, 233, 30, 99), 0.05);
-}
-.ab-panel-pet .ab-panel-header h3 i {
-    color: var(--panel-color, #e91e63);
-}
-
-/* Dosya Arşivi panel stili */
-.ab-panel-documents {
-    background-color: rgba(var(--panel-color-rgb, 96, 125, 139), 0.02);
-}
-.ab-panel-documents .ab-panel-header {
-    background-color: rgba(var(--panel-color-rgb, 96, 125, 139), 0.05);
-}
-.ab-panel-documents .ab-panel-header h3 i {
-    color: var(--panel-color, #607d8b);
-}
-
-/* Teklif panel stili */
-.ab-panel-offer {
-    background-color: rgba(var(--panel-color-rgb, 0, 188, 212), 0.02);
-}
-.ab-panel-offer .ab-panel-header {
-    background-color: rgba(var(--panel-color-rgb, 0, 188, 212), 0.05);
-}
-.ab-panel-offer .ab-panel-header h3 i {
-    color: var(--panel-color, #00bcd4);
+/* Remove panel type specific styles - use simple uniform styling */
+.ab-panel-personal, .ab-panel-corporate, .ab-panel-family, .ab-panel-vehicle, .ab-panel-home, .ab-panel-pet, .ab-panel-documents, .ab-panel-offer {
+    background-color: #fff;
 }
 
 .ab-full-panel {
@@ -1882,46 +1779,28 @@ function format_file_size($size) {
 }
 
 .ab-panel-header {
-    padding: 20px 24px 16px;
-    background: linear-gradient(135deg, rgba(var(--panel-color-rgb, 52, 152, 219), 0.08) 0%, rgba(var(--panel-color-rgb, 52, 152, 219), 0.03) 100%);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 10px 15px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    position: relative;
-}
-
-.ab-panel-header::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 24px;
-    right: 24px;
-    height: 1px;
-    background: linear-gradient(90deg, var(--panel-color, #ddd), transparent);
-    opacity: 0.3;
 }
 
 .ab-panel-header h3 {
     margin: 0;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 12px;
-    color: #1a1a1a;
-    letter-spacing: -0.02em;
+    gap: 8px;
+    color: #333;
 }
 
 .ab-panel-header h3 i {
-    font-size: 20px;
-    color: var(--panel-color, #3498db);
-    background: rgba(var(--panel-color-rgb, 52, 152, 219), 0.1);
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
+    font-size: 16px;
+    color: #666;
+}
     justify-content: center;
 }
 
@@ -1931,30 +1810,21 @@ function format_file_size($size) {
 }
 
 .ab-panel-body {
-    padding: 24px;
+    padding: 15px;
 }
 
-/* Material Design Info Grid */
+/* Clean Info Grid */
 .ab-info-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
-    margin-bottom: 4px;
+    gap: 10px;
 }
 
 .ab-info-item {
-    background: rgba(var(--panel-color-rgb, 52, 152, 219), 0.02);
-    border-radius: 8px;
-    padding: 16px;
-    border: 1px solid rgba(var(--panel-color-rgb, 52, 152, 219), 0.08);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.ab-info-item:hover {
-    background: rgba(var(--panel-color-rgb, 52, 152, 219), 0.04);
-    border-color: rgba(var(--panel-color-rgb, 52, 152, 219), 0.12);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background: #f9f9f9;
+    border-radius: 4px;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
 }
 
 .ab-full-width {
@@ -1965,28 +1835,23 @@ function format_file_size($size) {
     font-weight: 600;
     font-size: 12px;
     color: #666;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 
 .ab-info-value {
-    font-size: 15px;
-    font-weight: 500;
-    color: #1a1a1a;
+    font-size: 14px;
+    font-weight: normal;
+    color: #333;
     line-height: 1.4;
 }
 
 .ab-info-value a {
-    color: var(--panel-color, #2271b1);
+    color: #0073aa;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-weight: 600;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 4px;
 }
 
 .ab-info-value a:hover {
