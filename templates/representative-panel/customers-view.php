@@ -356,14 +356,8 @@ if (isset($_POST['ajax_delete_file']) && wp_verify_nonce($_POST['file_delete_non
     exit;
 }
 
-// AJAX Teklif Güncelleme İşlemi
-if (isset($_POST['ajax_update_offer']) && wp_verify_nonce($_POST['offer_nonce'], 'update_customer_offer')) {
-    // Output buffer'ı temizle
-    if (ob_get_level()) {
-        ob_clean();
-    }
-    
-    $response = array('success' => false, 'message' => '');
+// Normal Teklif Güncelleme İşlemi (AJAX yerine)
+if (isset($_POST['action']) && $_POST['action'] === 'update_offer' && isset($_POST['offer_nonce']) && wp_verify_nonce($_POST['offer_nonce'], 'update_customer_offer')) {
     $customer_id = intval($_POST['customer_id']);
     
     // Verileri sanitize et
@@ -386,20 +380,21 @@ if (isset($_POST['ajax_update_offer']) && wp_verify_nonce($_POST['offer_nonce'],
     );
     
     if ($update_result !== false) {
-        $response['success'] = true;
-        $response['message'] = 'Teklif bilgileri başarıyla kaydedildi.';
+        $message = 'Teklif bilgileri başarıyla kaydedildi.';
+        $message_type = 'success';
         
         // Hatırlatma görevi oluştur
         if (!empty($offer_data['offer_reminder']) && !empty($offer_data['offer_expiry_date'])) {
             create_offer_reminder_task($customer_id, $offer_data);
         }
     } else {
-        $response['message'] = 'Teklif bilgileri kaydedilirken bir hata oluştu.';
+        $message = 'Teklif bilgileri kaydedilirken bir hata oluştu.';
+        $message_type = 'error';
     }
     
-    // JSON yanıt gönder
-    header('Content-Type: application/json');
-    echo json_encode($response);
+    // Başarı mesajını session'a kaydet ve sayfayı yenile
+    $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
+    echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '&offer_updated=1";</script>';
     exit;
 }
 
@@ -449,7 +444,7 @@ if (isset($_POST['delete_file']) && isset($_POST['file_nonce']) && wp_verify_non
     exit;
 }
 
-// Görüşme notlarını al
+// Görüşme notlarını al (tarihe göre sıralı)
 $notes_table = $wpdb->prefix . 'insurance_crm_customer_notes';
 $customer_notes = $wpdb->get_results($wpdb->prepare("
     SELECT n.*, 
@@ -1323,32 +1318,32 @@ function format_file_size($size) {
                     </div>
                     <?php else: ?>
                         <?php foreach ($customer_notes as $note): ?>
-                        <div class="ab-note-item ab-note-<?php echo esc_attr($note->note_type); ?>">
-                            <div class="ab-note-header">
-                                <div class="ab-note-meta">
-                                    <span class="ab-note-user">
+                        <div class="ab-sticky-note sticky-note-<?php echo esc_attr($note->note_type); ?>">
+                            <div class="sticky-note-header">
+                                <div class="sticky-note-meta">
+                                    <span class="sticky-note-user">
                                         <i class="fas fa-user"></i> <?php echo esc_html($note->user_name); ?>
                                     </span>
-                                    <span class="ab-note-date">
+                                    <span class="sticky-note-date">
                                         <i class="fas fa-clock"></i> <?php echo date('d.m.Y H:i', strtotime($note->created_at)); ?>
                                     </span>
-                                    <span class="ab-note-type ab-badge ab-badge-<?php echo esc_attr($note->note_type); ?>">
-                                        <?php 
-                                        switch ($note->note_type) {
-                                            case 'positive': echo 'Olumlu'; break;
-                                            case 'neutral': echo 'Belirsiz'; break;
-                                            case 'negative': echo 'Olumsuz'; break;
-                                            default: echo ucfirst($note->note_type); break;
-                                        }
-                                        ?>
-                                    </span>
+                                </div>
+                                <div class="sticky-note-type-badge sticky-note-type-<?php echo esc_attr($note->note_type); ?>">
+                                    <?php 
+                                    switch ($note->note_type) {
+                                        case 'positive': echo 'Olumlu'; break;
+                                        case 'neutral': echo 'Belirsiz'; break;
+                                        case 'negative': echo 'Olumsuz'; break;
+                                        default: echo ucfirst($note->note_type); break;
+                                    }
+                                    ?>
                                 </div>
                             </div>
-                            <div class="ab-note-content">
+                            <div class="sticky-note-content">
                                 <?php echo nl2br(esc_html($note->note_content)); ?>
                             </div>
                             <?php if (!empty($note->rejection_reason)): ?>
-                            <div class="ab-note-reason">
+                            <div class="sticky-note-reason">
                                 <strong>Sebep:</strong> 
                                 <?php 
                                 switch ($note->rejection_reason) {
@@ -2111,6 +2106,135 @@ function format_file_size($size) {
 }
 
 /* Notlar Stilleri - Sticker/Baloncuk Tasarımı */
+/* Sticker Not Kağıdı Stilleri */
+.ab-sticky-note {
+    position: relative;
+    background: #ffd700;
+    padding: 15px 20px 20px 20px;
+    margin: 15px 10px;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: rotate(-1deg);
+    transition: all 0.3s ease;
+    max-width: 300px;
+    min-height: 120px;
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+}
+
+.ab-sticky-note:nth-child(even) {
+    transform: rotate(1deg);
+    margin-left: auto;
+    margin-right: 20px;
+    background: #ffb3ba;
+}
+
+.ab-sticky-note:nth-child(odd) {
+    transform: rotate(-1deg);
+    margin-left: 20px;
+    margin-right: auto;
+    background: #baffc9;
+}
+
+.ab-sticky-note:nth-child(3n) {
+    background: #bae1ff;
+    transform: rotate(0.5deg);
+}
+
+.ab-sticky-note:hover {
+    transform: rotate(0deg) scale(1.05);
+    z-index: 10;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.ab-sticky-note::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sticky-note-header {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed rgba(0, 0, 0, 0.3);
+}
+
+.sticky-note-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    font-size: 11px;
+    color: #555;
+    margin-bottom: 5px;
+}
+
+.sticky-note-user, .sticky-note-date {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.sticky-note-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.sticky-note-type-positive {
+    background: #28a745;
+    color: white;
+}
+
+.sticky-note-type-neutral {
+    background: #ffc107;
+    color: #333;
+}
+
+.sticky-note-type-negative {
+    background: #dc3545;
+    color: white;
+}
+
+.sticky-note-content {
+    font-size: 13px;
+    line-height: 1.4;
+    color: #333;
+    margin: 10px 0;
+    word-wrap: break-word;
+}
+
+.sticky-note-reason {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.2);
+    font-size: 11px;
+    color: #666;
+}
+
+/* Renk varyasyonları */
+.sticky-note-positive {
+    background: #d4edda !important;
+}
+
+.sticky-note-neutral {
+    background: #fff3cd !important;
+}
+
+.sticky-note-negative {
+    background: #f8d7da !important;
+}
+
 .ab-notes-list {
     display: flex;
     flex-direction: column;

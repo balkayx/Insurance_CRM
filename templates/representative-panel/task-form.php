@@ -118,33 +118,24 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'add_task') {
     }
 }
 
-// Kullanıcıları çek (görev atanabilir kişiler)
+// Müşteri temsilcilerini çek (policies-form.php referansı ile)
+$representatives_table = $wpdb->prefix . 'insurance_crm_representatives';
 $users = $wpdb->get_results("
-    SELECT DISTINCT u.ID, u.display_name, r.first_name, r.last_name, r.role_name
-    FROM {$wpdb->users} u
-    INNER JOIN {$wpdb->prefix}insurance_crm_representatives r ON u.ID = r.user_id
+    SELECT r.id, r.user_id, r.first_name, r.last_name, r.display_name, r.role_name
+    FROM $representatives_table r
     WHERE r.status = 'active'
-    ORDER BY r.first_name, r.last_name
+    ORDER BY r.display_name ASC
 ");
 
-// WordPress user nesnelerine dönüştür
-foreach ($users as &$user) {
-    $wp_user = get_userdata($user->ID);
-    if ($wp_user) {
-        $user->display_name = $wp_user->display_name;
-        if (empty($user->display_name)) {
-            $user->display_name = $user->first_name . ' ' . $user->last_name;
-        }
-    }
-}
-
-// Eğer hiç kullanıcı bulunamadıysa alternatif yöntem dene
+// Alternatif method eğer hiç temsilci bulunamazsa  
 if (empty($users)) {
-    $users = get_users([
-        'meta_key' => 'insurance_crm_role',
-        'meta_value' => '',
-        'meta_compare' => '!='
-    ]);
+    $users = $wpdb->get_results("
+        SELECT r.id, r.user_id, r.first_name, r.last_name, 
+               CONCAT(r.first_name, ' ', r.last_name) as display_name, r.role_name
+        FROM $representatives_table r
+        WHERE r.status = 'active'
+        ORDER BY r.first_name, r.last_name
+    ");
 }
 
 // Müşterileri çek - doğru tablo adıyla
@@ -583,10 +574,10 @@ error_log("Task form - Found " . count($customers) . " customers");
                         <option value="">Kişi Seçin</option>
                         <?php if (!empty($users)): ?>
                             <?php foreach ($users as $user): 
-                                $role_name = !empty($user->role_name) ? $user->role_name : get_user_meta($user->ID, 'insurance_crm_role_name', true);
+                                $role_name = !empty($user->role_name) ? $user->role_name : '';
                                 $display_name = !empty($user->display_name) ? $user->display_name : $user->first_name . ' ' . $user->last_name;
                             ?>
-                                <option value="<?php echo $user->ID; ?>">
+                                <option value="<?php echo $user->id; ?>">
                                     <?php echo esc_html($display_name); ?> 
                                     <?php if ($role_name): ?>
                                         (<?php echo esc_html($role_name); ?>)
