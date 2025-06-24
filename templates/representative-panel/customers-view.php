@@ -1,8 +1,8 @@
 <?php
 /**
  * Müşteri Detay Sayfası
- * @version 3.6.0
- * @description Teklif hatırlatma fonksiyonu, wpdb::prepare hataları ve tablo genişlik tutarlılığı düzeltildi
+ * @version 3.7.0
+ * @description Tablo genişlik tutarlılığı sorunu ve responsive tasarım düzeltildi
  */
 
 // Yetki kontrolü
@@ -1487,9 +1487,9 @@ function format_file_size($size) {
                 </div>
 
                 <!-- Mevcut Notlar -->
-                <div class="ab-notes-list" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 15px;">
+                <div class="ab-notes-list">
                     <?php if (empty($customer_notes)): ?>
-                    <div class="ab-empty-state" style="grid-column: 1 / -1; text-align: center;">
+                    <div class="ab-empty-state">
                         <p><i class="fas fa-comments"></i><br>Henüz görüşme notu eklenmemiş.</p>
                     </div>
                     <?php else: ?>
@@ -2423,10 +2423,24 @@ function format_file_size($size) {
 }
 
 .ab-notes-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 15px;
     margin-top: 15px;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.ab-empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 20px;
+}
+
+.ab-sticky-note {
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .ab-note-item {
@@ -2647,15 +2661,33 @@ function format_file_size($size) {
     margin-top: 15px;
 }
 
+/* Tablo ve panel genişlik tutarlılığı */
+.ab-panels {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.ab-panel, .ab-full-panel {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
 /* Tablo stilleri */
 .ab-table-container {
     overflow-x: auto;
     margin-bottom: 15px;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .ab-crm-table {
     width: 100%;
+    max-width: 100%;
     border-collapse: collapse;
+    table-layout: auto;
 }
 
 .ab-crm-table th,
