@@ -124,6 +124,26 @@ $users = get_users([
     'meta_value' => '',
     'meta_compare' => '!='
 ]);
+
+// Eğer hiç kullanıcı bulunamadıysa, tüm CRM temsilcilerini al
+if (empty($users)) {
+    $users = $wpdb->get_results("
+        SELECT DISTINCT u.ID, u.display_name, r.role_name
+        FROM {$wpdb->users} u
+        INNER JOIN {$wpdb->prefix}insurance_crm_representatives r ON u.ID = r.user_id
+        WHERE r.user_id IS NOT NULL
+    ");
+    
+    // WordPress user nesnelerine dönüştür
+    foreach ($users as &$user) {
+        $wp_user = get_userdata($user->ID);
+        if ($wp_user) {
+            $user = $wp_user;
+        }
+    }
+}
+
+error_log("Task form - Found " . count($users) . " assignable users");
 ?>
 
 <style>
@@ -486,6 +506,7 @@ $users = get_users([
 </div>
 
 <script>
+const ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
 jQuery(document).ready(function($) {
     let searchTimeout;
     let selectedCustomer = null;
@@ -507,6 +528,8 @@ jQuery(document).ready(function($) {
     });
     
     function searchCustomers(term) {
+        console.log('🔍 Müşteri aranıyor:', term);
+        
         $.ajax({
             url: ajaxurl,
             type: 'POST',
@@ -516,19 +539,24 @@ jQuery(document).ready(function($) {
                 nonce: '<?php echo wp_create_nonce("search_customers_nonce"); ?>'
             },
             success: function(response) {
+                console.log('📥 AJAX yanıtı alındı:', response);
                 if (response.success && response.data) {
                     displaySearchResults(response.data);
                 } else {
+                    console.log('❌ Arama başarısız:', response);
                     $('#customerSearchResults').html('<div class="customer-search-item">Müşteri bulunamadı</div>').show();
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.error('❌ AJAX hatası:', {xhr, status, error});
                 $('#customerSearchResults').html('<div class="customer-search-item">Arama sırasında hata oluştu</div>').show();
             }
         });
     }
     
     function displaySearchResults(customers) {
+        console.log('📋 Arama sonuçları gösteriliyor:', customers);
+        
         let html = '';
         customers.forEach(function(customer) {
             const customerType = customer.customer_type === 'kurumsal' ? 'Kurumsal' : 'Bireysel';
@@ -548,22 +576,31 @@ jQuery(document).ready(function($) {
         });
         
         $('#customerSearchResults').html(html).show();
+        console.log('✅ Arama sonuçları HTML güncellendi');
     }
     
     // Müşteri seçimi
     $(document).on('click', '.customer-search-item', function() {
+        console.log('🖱️ Müşteri öğesine tıklandı');
+        
         if ($(this).data('customer-id')) {
             const customerId = $(this).data('customer-id');
             const customerName = $(this).data('customer-name');
             const customerType = $(this).data('customer-type');
             
+            console.log('📦 Seçilen müşteri verileri:', {customerId, customerName, customerType});
+            
             selectCustomer(customerId, customerName, customerType);
             $('#customerSearchResults').hide();
             $('#customerSearch').val(customerName);
+        } else {
+            console.error('❌ Müşteri ID bulunamadı');
         }
     });
     
     function selectCustomer(customerId, customerName, customerType) {
+        console.log('👤 Müşteri seçiliyor:', {customerId, customerName, customerType});
+        
         selectedCustomer = {
             id: customerId,
             name: customerName,
@@ -571,6 +608,8 @@ jQuery(document).ready(function($) {
         };
         
         $('#selected_customer_id').val(customerId);
+        console.log('🔑 Hidden field güncellendi:', $('#selected_customer_id').val());
+        
         $('.selected-customer-name').text(customerName);
         $('.selected-customer-info').text(`Müşteri Tipi: ${customerType === 'kurumsal' ? 'Kurumsal' : 'Bireysel'}`);
         $('#selectedCustomerInfo').show();
@@ -622,23 +661,33 @@ jQuery(document).ready(function($) {
     
     // Form gönderimi kontrolü
     $('#taskForm').on('submit', function(e) {
+        console.log('📝 Form gönderimi kontrol ediliyor...');
+        console.log('Seçili müşteri ID:', $('#selected_customer_id').val());
+        console.log('Görev başlığı:', $('#task_title').val());
+        console.log('Atanacak kişi:', $('#assigned_to').val());
+        
         if (!$('#selected_customer_id').val()) {
             e.preventDefault();
             alert('Lütfen bir müşteri seçin.');
+            $('#customerSearch').focus();
             return false;
         }
         
         if (!$('#task_title').val().trim()) {
             e.preventDefault();
             alert('Lütfen görev başlığını girin.');
+            $('#task_title').focus();
             return false;
         }
         
         if (!$('#assigned_to').val()) {
             e.preventDefault();
             alert('Lütfen görevin atanacağı kişiyi seçin.');
+            $('#assigned_to').focus();
             return false;
         }
+        
+        console.log('✅ Form validasyonu başarılı, gönderiliyor...');
     });
     
     // Dış tıklamada arama sonuçlarını gizle
