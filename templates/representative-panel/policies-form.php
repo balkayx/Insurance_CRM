@@ -1962,6 +1962,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Poliçe detaylarını otomatik göster
         showPolicyDetailsSteps();
+
+        // Create from offer modunda müşteri verilerini yükle
+        if (isCreateFromOfferMode) {
+            const customerId = document.getElementById('selected_customer_id')?.value;
+            if (customerId) {
+                console.log('📝 Teklif modunda müşteri ID bulundu:', customerId);
+                setupExistingCustomerData(customerId);
+            }
+        }
         
         // Etkileşimli akış ve mevcut işlevsellik
         setupInteractiveFlow();
