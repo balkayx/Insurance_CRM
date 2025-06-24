@@ -3997,13 +3997,135 @@ jQuery(document).ready(function($) {
 </style>
 
 <style>
+/* Enhanced Corporate Customer View Styles */
+.ab-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.ab-panel {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.ab-panel:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
+}
+
+.ab-panel-header {
+    background: linear-gradient(135deg, var(--panel-color, #3498db) 0%, rgba(var(--panel-color-rgb, 52, 152, 219), 0.8) 100%);
+    color: white;
+    padding: 18px 24px;
+    font-weight: 600;
+    border-bottom: none;
+    position: relative;
+}
+
+.ab-panel-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.ab-panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+}
+
+.ab-panel-header h3 i {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.ab-panel-body {
+    padding: 24px;
+}
+
+.ab-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.ab-info-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s ease;
+}
+
+.ab-info-item:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.ab-info-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.ab-info-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1e293b;
+    line-height: 1.4;
+}
+
+.ab-info-value a {
+    color: #3b82f6;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s ease;
+}
+
+.ab-info-value a:hover {
+    color: #1d4ed8;
+}
+
+.no-value {
+    color: #9ca3af;
+    font-style: italic;
+}
+
 /* Enhanced Corporate Quote Form Styles */
 .modern-quote-form {
-    background: linear-gradient(135deg, #2c3e50 0%, #3498db 50%, #2980b9 100%);
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
     border-radius: 20px;
     padding: 0;
-    margin-bottom: 30px;
-    box-shadow: 0 25px 60px rgba(44, 62, 80, 0.2), 0 15px 40px rgba(52, 152, 219, 0.1);
+    margin: 20px 0;
+    box-shadow: 0 20px 50px rgba(30, 64, 175, 0.15), 0 10px 30px rgba(59, 130, 246, 0.1);
     overflow: hidden;
     position: relative;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -4017,91 +4139,87 @@ jQuery(document).ready(function($) {
     right: 0;
     bottom: 0;
     background: 
-        radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.15) 0%, transparent 50%),
-        radial-gradient(ellipse at bottom right, rgba(52, 152, 219, 0.1) 0%, transparent 50%);
+        radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at bottom right, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
     pointer-events: none;
 }
 
 .quote-form-header {
     background: rgba(255, 255, 255, 0.98);
-    padding: 32px 40px;
+    padding: 28px 32px;
     display: flex;
     align-items: center;
-    gap: 24px;
-    border-bottom: 2px solid rgba(52, 152, 219, 0.1);
-    backdrop-filter: blur(15px);
+    gap: 20px;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+    backdrop-filter: blur(10px);
     position: relative;
+    z-index: 1;
 }
 
 .quote-form-header::after {
     content: '';
     position: absolute;
     bottom: 0;
-    left: 40px;
-    right: 40px;
+    left: 32px;
+    right: 32px;
     height: 2px;
-    background: linear-gradient(90deg, #3498db 0%, #2980b9 100%);
+    background: linear-gradient(90deg, #3b82f6 0%, #1e40af 100%);
 }
 
 .quote-form-icon {
-    width: 70px;
-    height: 70px;
-    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-    border-radius: 20px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 28px;
-    box-shadow: 
-        0 10px 30px rgba(52, 152, 219, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    font-size: 24px;
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
     position: relative;
 }
 
 .quote-form-icon::before {
     content: '';
     position: absolute;
-    top: 2px;
-    left: 2px;
-    right: 2px;
-    bottom: 2px;
+    top: 1px;
+    left: 1px;
+    right: 1px;
+    bottom: 1px;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
-    border-radius: 18px;
+    border-radius: 15px;
     pointer-events: none;
 }
 
 .quote-form-title h4 {
-    margin: 0 0 8px 0;
-    font-size: 24px;
+    margin: 0 0 6px 0;
+    font-size: 20px;
     font-weight: 700;
-    color: #2c3e50;
-    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.5px;
+    color: #1e293b;
+    letter-spacing: -0.3px;
 }
 
 .quote-form-title p {
     margin: 0;
-    color: #7f8c8d;
-    font-size: 15px;
-    line-height: 1.5;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.4;
     font-weight: 500;
 }
 
 .modern-form-container {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    padding: 40px;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 32px;
     position: relative;
+    z-index: 1;
 }
 
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-bottom: 24px;
+    gap: 20px;
+    margin-bottom: 20px;
 }
 
 .form-field {
@@ -4115,64 +4233,61 @@ jQuery(document).ready(function($) {
 .modern-label {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-    font-weight: 700;
-    font-size: 15px;
-    color: #2c3e50;
-    letter-spacing: 0.3px;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #1e293b;
+    letter-spacing: 0.2px;
 }
 
 .modern-label i {
-    color: #3498db;
-    width: 18px;
+    color: #3b82f6;
+    width: 16px;
     text-align: center;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .modern-input {
     width: 100%;
-    padding: 16px 20px;
-    border: 2px solid #ecf0f1;
-    border-radius: 15px;
-    font-size: 16px;
+    padding: 14px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 14px;
     background: #ffffff;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s ease;
     box-sizing: border-box;
     font-weight: 500;
-    color: #2c3e50;
+    color: #1e293b;
 }
 
 .modern-input:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: #3b82f6;
     background: #ffffff;
-    box-shadow: 
-        0 0 0 4px rgba(52, 152, 219, 0.1),
-        0 8px 25px rgba(52, 152, 219, 0.15);
-    transform: translateY(-2px);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    transform: translateY(-1px);
 }
 
 .modern-input:hover {
-    border-color: #bdc3c7;
+    border-color: #cbd5e1;
     background: #ffffff;
-    transform: translateY(-1px);
 }
 
 .modern-select {
     cursor: pointer;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233498db' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 16px center;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 12px center;
     background-repeat: no-repeat;
-    background-size: 18px;
-    padding-right: 48px;
+    background-size: 16px;
+    padding-right: 40px;
 }
 
 .modern-textarea {
     resize: vertical;
-    min-height: 120px;
+    min-height: 100px;
     font-family: inherit;
-    line-height: 1.6;
+    line-height: 1.5;
 }
 
 .form-actions {

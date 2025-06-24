@@ -983,17 +983,17 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
                 </div>
 
                 <div class="filters-actions">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i>
-                        <span>Filtrele</span>
+                    <button type="button" onclick="fixAllNames()" class="btn btn-warning fix-names-btn">
+                        <i class="fas fa-text-height"></i>
+                        <span>İSİMLERİ DÜZELT</span>
                     </button>
                     <a href="?view=<?php echo esc_attr($view_type); ?>" class="btn btn-outline">
                         <i class="fas fa-undo"></i>
                         <span>Sıfırla</span>
                     </a>
-                    <button type="button" onclick="fixAllNames()" class="btn btn-warning">
-                        <i class="fas fa-text-height"></i>
-                        <span>İSİMLERİ DÜZELT</span>
+                    <button type="submit" class="btn btn-primary" onclick="hideFilterSectionAfterSubmit()">
+                        <i class="fas fa-search"></i>
+                        <span>Filtrele</span>
                     </button>
                 </div>
             </form>
@@ -2362,9 +2362,21 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
 .filters-actions {
     display: flex;
     gap: var(--spacing-md);
+    align-items: center;
     justify-content: flex-end;
+    flex-wrap: wrap;
     padding-top: var(--spacing-lg);
     border-top: 1px solid var(--outline-variant);
+    margin-top: var(--spacing-lg);
+}
+
+.fix-names-btn {
+    margin-right: auto; /* Push to the far left */
+}
+
+.filters-actions .btn {
+    min-width: 120px;
+    justify-content: center;
 }
 
 /* Dashboard Section */
@@ -3922,6 +3934,18 @@ class ModernCustomersApp {
         console.log('  ✓ Responsive tasarım korundu');
         console.log('🎯 Sistem üretim için hazır ve tamamen işlevsel');
     }
+}
+
+// Filter section auto-hide functionality
+function hideFilterSectionAfterSubmit() {
+    setTimeout(() => {
+        const filterSection = document.getElementById('filterSection');
+        const filterToggle = document.getElementById('filterToggle');
+        if (filterSection && filterToggle) {
+            filterSection.classList.remove('show');
+            filterToggle.querySelector('.chevron').style.transform = 'rotate(0deg)';
+        }
+    }, 100);
 }
 
 // Name fixing functionality

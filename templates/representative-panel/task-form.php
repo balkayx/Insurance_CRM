@@ -646,42 +646,41 @@ jQuery(document).ready(function($) {
         console.log('🔍 AJAX çağrısı başlatılıyor. Arama terimi:', term);
         console.log('🌐 AJAX URL:', ajaxurl);
         
-        const requestData = {
-            action: 'search_customers_for_task',
-            search_term: term,
-            nonce: '<?php echo wp_create_nonce("customer_search"); ?>'
-        };
+        const formData = new FormData();
+        formData.append('action', 'search_customers_for_policy');
+        formData.append('query', term);
+        formData.append('nonce', '<?php echo wp_create_nonce("search_customers_nonce"); ?>');
         
-        console.log('📤 Gönderilen veri:', requestData);
+        console.log('📤 Gönderilen veri:', {
+            action: 'search_customers_for_policy',
+            query: term,
+            nonce: '<?php echo wp_create_nonce("search_customers_nonce"); ?>'
+        });
         
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: requestData,
-            beforeSend: function() {
-                console.log('⏳ AJAX isteği gönderiliyor...');
-                $('#customerSearchResults').html('<div class="customer-search-item">Aranıyor...</div>').show();
-            },
-            success: function(response) {
-                console.log('✅ AJAX başarılı yanıt alındı:', response);
-                console.log('📊 Yanıt tipi:', typeof response, 'Success:', response.success);
-                
-                if (response.success && response.data && Array.isArray(response.data)) {
-                    console.log('📋 Müşteri sayısı:', response.data.length);
-                    displaySearchResults(response.data);
-                } else {
-                    console.log('❌ Arama başarısız veya veri bulunamadı:', response);
-                    $('#customerSearchResults').html('<div class="customer-search-item">Müşteri bulunamadı</div>').show();
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('❌ AJAX hatası:');
-                console.error('  XHR:', xhr);
-                console.error('  Status:', status);
-                console.error('  Error:', error);
-                console.error('  Response Text:', xhr.responseText);
-                $('#customerSearchResults').html('<div class="customer-search-item">Arama sırasında hata oluştu: ' + error + '</div>').show();
+        $('#customerSearchResults').html('<div class="customer-search-item">Aranıyor...</div>').show();
+        
+        fetch(ajaxurl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            console.log('📥 Ham yanıt alındı:', response);
+            return response.json();
+        })
+        .then(data => {
+            console.log('✅ JSON parse başarılı:', data);
+            
+            if (data.success && data.data && Array.isArray(data.data)) {
+                console.log('📋 Müşteri sayısı:', data.data.length);
+                displaySearchResults(data.data);
+            } else {
+                console.log('❌ Arama başarısız veya veri bulunamadı:', data);
+                $('#customerSearchResults').html('<div class="customer-search-item">Müşteri bulunamadı</div>').show();
             }
+        })
+        .catch(error => {
+            console.error('❌ Fetch hatası:', error);
+            $('#customerSearchResults').html('<div class="customer-search-item">Bağlantı hatası oluştu</div>').show();
         });
     }
     

@@ -787,17 +787,20 @@ function get_allowed_file_types_text() {
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <div class="ab-customer-form-container">
-    <!-- Geri dön butonu -->
-    <div class="ab-form-header modern-header">
+    <!-- Modern Corporate Form Header -->
+    <div class="ab-form-header corporate-header">
+        <div class="header-background">
+            <div class="header-gradient"></div>
+        </div>
         <div class="ab-header-left">
             <div class="header-title-container">
                 <div class="header-icon">
                     <i class="fas <?php echo $editing ? 'fa-user-edit' : 'fa-user-plus'; ?>"></i>
                 </div>
                 <div class="header-content">
-                    <h1 class="header-title"><?php echo $editing ? 'Müşteri Düzenle' : 'Yeni Müşteri Ekle'; ?></h1>
+                    <h1 class="header-title"><?php echo $editing ? 'Müşteri Bilgilerini Düzenle' : 'Yeni Müşteri Kayıt'; ?></h1>
                     <div class="header-subtitle">
-                        <?php echo $editing ? 'Müşteri bilgilerini güncelleyin' : 'Sistemde yeni bir müşteri oluşturun'; ?>
+                        <?php echo $editing ? 'Mevcut müşteri bilgilerini güncelleyin' : 'Sistemde yeni bir müşteri hesabı oluşturun'; ?>
                     </div>
                 </div>
             </div>
@@ -1590,6 +1593,71 @@ function get_allowed_file_types_text() {
     margin-bottom: 20px;
     padding-bottom: 15px;
     border-bottom: 1px solid #e0e0e0;
+}
+
+/* Modern Corporate Header Styles */
+.corporate-header {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
+    color: white;
+    padding: 32px 40px;
+    border-radius: 16px;
+    margin-bottom: 32px;
+    border-bottom: none;
+    box-shadow: 0 12px 40px rgba(30, 64, 175, 0.15);
+    position: relative;
+    overflow: hidden;
+}
+
+.corporate-header .header-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.1;
+}
+
+.corporate-header .header-gradient {
+    background: radial-gradient(ellipse at top right, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
+    width: 100%;
+    height: 100%;
+}
+
+.corporate-header .header-title-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.corporate-header .header-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.corporate-header .header-title {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.5px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.corporate-header .header-subtitle {
+    font-size: 16px;
+    opacity: 0.9;
+    margin-top: 6px;
+    font-weight: 400;
+    line-height: 1.4;
 }
 
 /* Modern Header Styles */
