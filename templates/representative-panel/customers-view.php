@@ -1,8 +1,8 @@
 <?php
 /**
  * Müşteri Detay Sayfası
- * @version 3.4.0
- * @description Teklif formu ve görev validasyonu iyileştirmeleri
+ * @version 3.5.0
+ * @description Teklif hatırlatma fonksiyonu ve wpdb::prepare hataları düzeltildi
  */
 
 // Yetki kontrolü
@@ -279,8 +279,7 @@ $base_query = "
     LEFT JOIN {$wpdb->users} u ON r.user_id = u.ID
     LEFT JOIN {$wpdb->prefix}insurance_crm_representatives fr ON c.ilk_kayit_eden = fr.id
     LEFT JOIN {$wpdb->users} fu ON fr.user_id = fu.ID
-    WHERE c.id = %d{$where_clause}
-";
+    WHERE c.id = %d" . $where_clause;
 
 $customer = $wpdb->get_row($wpdb->prepare($base_query, $where_params));
 
@@ -402,6 +401,12 @@ if (isset($_POST['ajax_delete_file']) && wp_verify_nonce($_POST['file_delete_non
 if (isset($_POST['action']) && $_POST['action'] === 'update_offer' && isset($_POST['offer_nonce']) && wp_verify_nonce($_POST['offer_nonce'], 'update_customer_offer')) {
     $customer_id = intval($_POST['customer_id']);
     
+    // Müşteri bilgilerini al (hatırlatma görev açıklaması için)
+    $customer = $wpdb->get_row($wpdb->prepare(
+        "SELECT first_name, last_name FROM $customers_table WHERE id = %d", 
+        $customer_id
+    ));
+    
     // Verileri sanitize et
     $offer_data = array(
         'has_offer' => 1,
@@ -427,7 +432,31 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_offer' && isset($_PO
         
         // Hatırlatma görevi oluştur
         if (!empty($offer_data['offer_reminder']) && !empty($offer_data['offer_expiry_date'])) {
-            create_offer_reminder_task($customer_id, $offer_data);
+            // Hatırlatma görevi oluştur - işlevsellik eklendi
+            $task_title = 'Teklif Takip Hatırlatması';
+            $task_description = 'Müşteri: ' . $customer->first_name . ' ' . $customer->last_name . ' için teklif son tarihi: ' . $offer_data['offer_expiry_date'];
+            
+            $tasks_table = $wpdb->prefix . 'insurance_crm_tasks';
+            $reminder_result = $wpdb->insert(
+                $tasks_table,
+                array(
+                    'task_title' => $task_title,
+                    'customer_id' => $customer_id,
+                    'assigned_to' => get_current_user_id(),
+                    'description' => $task_description,
+                    'status' => 'beklemede',
+                    'priority' => 'high',
+                    'due_date' => $offer_data['offer_expiry_date'],
+                    'created_by' => get_current_user_id()
+                ),
+                array('%s', '%d', '%d', '%s', '%s', '%s', '%s', '%d')
+            );
+            
+            if ($reminder_result) {
+                error_log("Teklif hatırlatma görevi başarıyla oluşturuldu. Görev ID: " . $wpdb->insert_id);
+            } else {
+                error_log("Teklif hatırlatma görevi oluşturulamadı. Hata: " . $wpdb->last_error);
+            }
         }
     } else {
         $message = 'Teklif bilgileri kaydedilirken bir hata oluştu.';

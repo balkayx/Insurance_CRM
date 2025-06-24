@@ -1,10 +1,10 @@
 <?php
 /**
  * Görev Ekleme/Düzenleme Formu
- * @version 2.1.0
- * @date 2025-06-23
+ * @version 2.2.0
+ * @date 2025-06-24
  * @author anadolubirlik
- * @description Validasyon hatası ve poliçe hizalama iyileştirmeleri
+ * @description Debug logging eklendi, validasyon hatası analizi
  */
 
 include_once(dirname(__FILE__) . '/template-colors.php');
@@ -901,6 +901,10 @@ jQuery(document).ready(function($) {
         console.log('Poliçe ID:', $('#selected_policy_id').val());
         console.log('Poliçe seçmeden devam:', $('#continueWithoutPolicy').is(':checked'));
         
+        // DOM element kontrolü
+        console.log('Görev başlığı elementi:', $('#task_title')[0]);
+        console.log('Görev başlığı element sayısı:', $('#task_title').length);
+        
         if (!$('#selected_customer_id').val()) {
             e.preventDefault();
             alert('Lütfen önce bir müşteri seçin.');
@@ -908,11 +912,37 @@ jQuery(document).ready(function($) {
             return false;
         }
         
-        if (!$('#task_title').val().trim()) {
+        // Görev başlığı kontrolü - detaylı debug
+        var taskTitleValue = $('#task_title').val();
+        var taskTitleTrimmed = taskTitleValue ? taskTitleValue.trim() : '';
+        
+        console.log('Raw task title value:', taskTitleValue);
+        console.log('Trimmed task title:', taskTitleTrimmed);
+        console.log('Task title length:', taskTitleTrimmed.length);
+        console.log('Is empty?', !taskTitleTrimmed);
+        
+        if (!taskTitleTrimmed) {
             e.preventDefault();
+            console.error('❌ Görev başlığı boş!');
+            console.log('Field value:', taskTitleValue);
+            console.log('Field length:', taskTitleValue ? taskTitleValue.length : 'null/undefined');
+            console.log('Field after trim:', taskTitleTrimmed);
+            console.log('Field exists:', $('#task_title').length);
+            
+            // Element durumunu kontrol et
+            var element = $('#task_title')[0];
+            if (element) {
+                console.log('Element type:', element.type);
+                console.log('Element disabled:', element.disabled);
+                console.log('Element readOnly:', element.readOnly);
+                console.log('Element style.display:', element.style.display);
+            }
+            
             alert('Lütfen görev başlığını girin.');
             $('#task_title').focus();
             return false;
+        } else {
+            console.log('✅ Görev başlığı geçerli:', taskTitleTrimmed);
         }
         
         if (!$('#assigned_to').val()) {
