@@ -768,7 +768,31 @@ function handle_customer_file_uploads($customer_id) {
     }
 }
 
-// Note: Helper functions (get_file_icon, format_file_size, delete_customer_file) are defined in customers-view.php to avoid redeclaration
+// Helper functions
+if (!function_exists('get_file_icon')) {
+    function get_file_icon($file_type) {
+        switch ($file_type) {
+            case 'pdf':
+                return 'fa-file-pdf';
+            case 'doc':
+            case 'docx':
+                return 'fa-file-word';
+            case 'jpg':
+            case 'jpeg':
+            case 'png':
+                return 'fa-file-image';
+            case 'xls':
+            case 'xlsx':
+                return 'fa-file-excel';
+            case 'txt':
+                return 'fa-file-alt';
+            case 'zip':
+                return 'fa-file-archive';
+            default:
+                return 'fa-file';
+        }
+    }
+}
 
 // İzin verilen dosya tiplerini alma ve formatı düzenleme
 function get_allowed_file_types_text() {

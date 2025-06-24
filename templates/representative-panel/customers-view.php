@@ -4,9 +4,6 @@
  * @version 3.3.0
  */
 
-// Start output buffering to prevent output before AJAX responses
-ob_start();
-
 // Yetki kontrolü
 if (!is_user_logged_in() || !isset($_GET['id'])) {
     return;
@@ -36,6 +33,140 @@ if (isset($_POST['action']) && $_POST['action'] === 'create_reminder_task' && is
             require_once(dirname(__FILE__) . '/customers-form.php');
         }
         
+        // Eğer fonksiyon hala tanımlı değilse, burada tanımla
+        if (!function_exists('create_offer_reminder_task')) {
+            function create_offer_reminder_task($customer_id, $offer_data) {
+                global $wpdb;
+                
+                // Debug log
+                error_log("create_offer_reminder_task called for customer $customer_id with data: " . print_r($offer_data, true));
+                
+                // Teklif hatırlatması aktif değilse veya vade tarihi yoksa çık
+                if (empty($offer_data['offer_reminder']) || empty($offer_data['offer_expiry_date'])) {
+                    error_log("create_offer_reminder_task: Early exit - offer_reminder: " . ($offer_data['offer_reminder'] ?? 'empty') . ", offer_expiry_date: " . ($offer_data['offer_expiry_date'] ?? 'empty'));
+                    return;
+                }
+                
+                $tasks_table = $wpdb->prefix . 'insurance_crm_tasks';
+                $customers_table = $wpdb->prefix . 'insurance_crm_customers';
+                
+                // Önce tasks tablosunun yapısını kontrol et
+                $columns = $wpdb->get_results("DESCRIBE {$tasks_table}");
+                $column_names = array();
+                foreach ($columns as $col) {
+                    $column_names[] = $col->Field;
+                }
+                error_log("Tasks table columns: " . implode(', ', $column_names));
+                
+                // Müşteri bilgilerini al (temsilci ID'si dahil)
+                $customer = $wpdb->get_row($wpdb->prepare(
+                    "SELECT first_name, last_name, phone, representative_id FROM {$customers_table} WHERE id = %d",
+                    $customer_id
+                ));
+                
+                if (!$customer) {
+                    error_log("create_offer_reminder_task: Customer not found for ID $customer_id");
+                    return;
+                }
+                
+                error_log("Customer found: " . $customer->first_name . " " . $customer->last_name . ", rep_id: " . $customer->representative_id);
+                
+                // Hatırlatma tarihini hesapla (vade tarihinden 1 gün önce saat 10:00)
+                $expiry_date = date('Y-m-d', strtotime($offer_data['offer_expiry_date']));
+                $reminder_date = date('Y-m-d', strtotime($expiry_date . ' -1 day'));
+                $reminder_datetime = $reminder_date . ' 10:00:00';
+                
+                // Görev başlığı ve açıklaması
+                $task_title = "Teklif hatırlatma görevi";
+                $task_description = "Teklif hatırlatma görevi\n\n";
+                $task_description .= "Müşteri Adı Soyadı: " . $customer->first_name . " " . $customer->last_name . "\n";
+                $task_description .= "Telefon: " . $customer->phone . "\n";
+                $task_description .= "Teklif İçeriği: " . ($offer_data['offer_insurance_type'] ?? 'TSS') . " - " . ($offer_data['offer_amount'] ? number_format($offer_data['offer_amount'], 2, ',', '.') . ' TL' : '20,000.00 TL') . "\n";
+                $task_description .= "Teklif Vade Tarihi: " . date('d.m.Y', strtotime($expiry_date)) . "\n\n";
+                $task_description .= "Müşteriyi arayarak teklif durumunu kontrol ediniz.";
+                
+                // Temsilci atama mantığı: 
+                // 1. Müşteriye zaten bir temsilci atanmışsa o temsilciyi kullan
+                // 2. Yoksa işlemi yapan kullanıcıyı ata
+                $assigned_representative_id = $customer->representative_id;
+                if (!$assigned_representative_id) {
+                    $assigned_representative_id = get_current_user_rep_id();
+                }
+                
+                error_log("Assigned representative ID: $assigned_representative_id");
+                
+                // Sütun adlarına göre task_data'yı dinamik olarak oluştur
+                $task_data = array(
+                    'customer_id' => $customer_id,
+                    'representative_id' => $assigned_representative_id,
+                    'priority' => 'medium',
+                    'status' => 'pending', 
+                    'due_date' => $reminder_datetime
+                );
+                
+                // task_title sütunu varsa ekle
+                if (in_array('task_title', $column_names)) {
+                    $task_data['task_title'] = $task_title;
+                }
+                
+                // task_description sütunu varsa ekle
+                if (in_array('task_description', $column_names)) {
+                    $task_data['task_description'] = $task_description;
+                }
+                
+                // title sütunu varsa ekle (eski sistem için)
+                if (in_array('title', $column_names)) {
+                    $task_data['title'] = $task_title;
+                }
+                
+                // description sütunu varsa ekle (eski sistem için)
+                if (in_array('description', $column_names)) {
+                    $task_data['description'] = $task_description;
+                }
+                
+                // task_type sütunu varsa ekle
+                if (in_array('task_type', $column_names)) {
+                    $task_data['task_type'] = 'teklif_hatirlatma';
+                }
+                
+                // created_at sütunu varsa ekle
+                if (in_array('created_at', $column_names)) {
+                    $task_data['created_at'] = current_time('mysql');
+                }
+                
+                // updated_at sütunu varsa ekle
+                if (in_array('updated_at', $column_names)) {
+                    $task_data['updated_at'] = current_time('mysql');
+                }
+                
+                error_log("Task data prepared: " . print_r($task_data, true));
+                
+                // Önceki bekleyen teklif hatırlatma görevlerini kontrol et ve sil
+                $delete_conditions = array(
+                    'customer_id' => $customer_id,
+                    'status' => 'pending'
+                );
+                
+                // task_type sütunu varsa koşula ekle
+                if (in_array('task_type', $column_names)) {
+                    $delete_conditions['task_type'] = 'teklif_hatirlatma';
+                }
+                
+                $deleted = $wpdb->delete($tasks_table, $delete_conditions);
+                error_log("Deleted previous tasks: $deleted");
+                
+                // Yeni görevi ekle
+                $result = $wpdb->insert($tasks_table, $task_data);
+                
+                if ($result) {
+                    error_log("SUCCESS: Offer reminder task created for customer {$customer_id}, assigned to representative {$assigned_representative_id}, due date: {$reminder_datetime}");
+                } else {
+                    error_log("FAILED to create offer reminder task for customer {$customer_id}: " . $wpdb->last_error);
+                    error_log("Last query: " . $wpdb->last_query);
+                }
+            }
+        }
+        
         // Hatırlatma görevi oluştur
         create_offer_reminder_task($customer_id, $offer_data);
         
@@ -46,98 +177,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'create_reminder_task' && is
     }
     
     // Sayfayı yenile
-    echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
+    echo '<script>window.location.href = "?view=customers-view&id=' . $customer_id . '";</script>';
     exit;
-}
-
-// AJAX Teklif durumu güncelleme işlemi
-if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && isset($_POST['customer_id'])) {
-    if (!wp_verify_nonce($_POST['quote_nonce'], 'update_customer_quote')) {
-        wp_die('Security check failed');
-    }
-    
-    $customer_id = intval($_POST['customer_id']);
-    $is_ajax = isset($_POST['ajax']);
-    
-    // Debug logging
-    error_log("Quote update - POST customer_id: " . $_POST['customer_id']);
-    error_log("Quote update - Processed customer_id: " . $customer_id);
-    error_log("Quote update - Is AJAX: " . ($is_ajax ? 'Yes' : 'No'));
-    
-    // Validate customer ID
-    if (empty($customer_id) || $customer_id <= 0) {
-        if ($is_ajax) {
-            // Clean any output buffer before sending JSON
-            while (ob_get_level()) {
-                ob_end_clean();
-            }
-            header('Content-Type: application/json');
-            echo json_encode(array('success' => false, 'data' => 'Geçersiz müşteri ID'));
-            exit;
-        } else {
-            $_SESSION['crm_notice'] = '<div class="ab-notice ab-error">Geçersiz müşteri ID.</div>';
-            echo '<script>window.location.href = "?view=customers";</script>';
-            exit;
-        }
-    }
-    
-    $quote_data = array(
-        'has_offer' => 1,
-        'offer_insurance_type' => sanitize_text_field($_POST['offer_insurance_type']),
-        'offer_amount' => floatval($_POST['offer_amount']),
-        'offer_expiry_date' => sanitize_text_field($_POST['offer_expiry_date']),
-        'offer_reminder' => intval($_POST['offer_reminder']),
-        'offer_notes' => sanitize_textarea_field($_POST['offer_notes'])
-    );
-    
-    $result = $wpdb->update($customers_table, $quote_data, array('id' => $customer_id));
-    
-    if ($result !== false) {
-        // Create reminder task if requested
-        if ($quote_data['offer_reminder'] == 1 && !empty($quote_data['offer_expiry_date'])) {
-            // Debug: Log the customer_id before calling the function
-            error_log("About to call create_offer_reminder_task with customer_id: $customer_id");
-            
-            if (!function_exists('create_offer_reminder_task')) {
-                require_once(dirname(__FILE__) . '/customers-form.php');
-            }
-            
-            // Make sure customer_id is still valid
-            if ($customer_id > 0) {
-                create_offer_reminder_task($customer_id, $quote_data);
-            } else {
-                error_log("ERROR: Customer ID is 0 before calling create_offer_reminder_task");
-            }
-        }
-        
-        if ($is_ajax) {
-            // Clean any output buffer before sending JSON
-            while (ob_get_level()) {
-                ob_end_clean();
-            }
-            header('Content-Type: application/json');
-            echo json_encode(array('success' => true, 'data' => 'Teklif bilgileri başarıyla güncellendi.'));
-            exit;
-        } else {
-            $_SESSION['crm_notice'] = '<div class="ab-notice ab-success">Teklif bilgileri başarıyla güncellendi.</div>';
-            echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
-            exit;
-        }
-    } else {
-        if ($is_ajax) {
-            // Clean any output buffer before sending JSON
-            while (ob_get_level()) {
-                ob_end_clean();
-            }
-            header('Content-Type: application/json');
-            echo json_encode(array('success' => false, 'data' => 'Teklif bilgileri güncellenirken hata oluştu.'));
-            exit;
-        } else {
-            $_SESSION['crm_notice'] = '<div class="ab-notice ab-error">Teklif bilgileri güncellenirken hata oluştu.</div>';
-            echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
-            exit;
-        }
-    }
 }
 
 $customer_id = intval($_GET['id']);
@@ -199,7 +240,7 @@ $base_query = "
     WHERE c.id = %d{$where_clause}
 ";
 
-$customer = $wpdb->get_row($wpdb->prepare($base_query, ...$where_params));
+$customer = $wpdb->get_row($wpdb->prepare($base_query, $where_params));
 
 if (!$customer) {
     echo '<div class="ab-notice ab-error">Müşteri bulunamadı veya görüntüleme yetkiniz yok.</div>';
@@ -209,58 +250,10 @@ if (!$customer) {
 // Müşterinin poliçelerini al
 $policies_table = $wpdb->prefix . 'insurance_crm_policies';
 $policies = $wpdb->get_results($wpdb->prepare("
-    SELECT p.*, c.first_name, c.last_name, c.tc_identity, c.spouse_name, c.spouse_tc_identity, 
-           c.children_names, c.children_tc_identities
-    FROM $policies_table p
-    LEFT JOIN $customers_table c ON p.customer_id = c.id
-    WHERE p.customer_id = %d
-    ORDER BY p.end_date ASC
+    SELECT * FROM $policies_table 
+    WHERE customer_id = %d
+    ORDER BY end_date ASC
 ", $customer_id));
-
-// Sigortalı listesini parse etmek için fonksiyon (policies-view.php'den alınmıştır)
-function parse_insured_list_customer_view($insured_list, $policy) {
-    if (empty($insured_list)) return [];
-    
-    $insured_persons = array();
-    $names = explode(',', $insured_list);
-    
-    foreach ($names as $name) {
-        $name = trim($name);
-        if (empty($name)) continue;
-        
-        $person = array('name' => $name, 'tc' => 'Belirtilmemiş', 'type' => 'Diğer');
-        
-        // Müşterinin kendisi mi kontrol et
-        $customer_full_name = trim($policy->first_name . ' ' . $policy->last_name);
-        if ($name === $customer_full_name) {
-            $person['tc'] = $policy->tc_identity ?: 'Belirtilmemiş';
-            $person['type'] = 'Müşteri';
-        }
-        // Eş mi kontrol et
-        elseif (!empty($policy->spouse_name) && $name === trim($policy->spouse_name)) {
-            $person['tc'] = $policy->spouse_tc_identity ?: 'Belirtilmemiş';
-            $person['type'] = 'Eş';
-        }
-        // Çocuk mu kontrol et
-        elseif (!empty($policy->children_names)) {
-            $children_names = explode(',', $policy->children_names);
-            $children_tcs = !empty($policy->children_tc_identities) ? explode(',', $policy->children_tc_identities) : array();
-            
-            foreach ($children_names as $index => $child_name) {
-                $child_name = trim($child_name);
-                if ($name === $child_name) {
-                    $person['tc'] = isset($children_tcs[$index]) ? trim($children_tcs[$index]) : 'Belirtilmemiş';
-                    $person['type'] = 'Çocuk';
-                    break;
-                }
-            }
-        }
-        
-        $insured_persons[] = $person;
-    }
-    
-    return $insured_persons;
-}
 
 // Müşterinin görevlerini al
 $tasks_table = $wpdb->prefix . 'insurance_crm_tasks';
@@ -316,14 +309,7 @@ $accept_attribute = '.' . implode(',.', $allowed_file_types);
 if (isset($_POST['ajax_upload_files']) && wp_verify_nonce($_POST['file_upload_nonce'], 'file_upload_action')) {
     $response = array('success' => false, 'message' => '', 'files' => array());
     
-    // Ensure file upload function is available
-    if (!function_exists('handle_customer_file_uploads')) {
-        if (file_exists(dirname(__FILE__) . '/customers-form.php')) {
-            require_once(dirname(__FILE__) . '/customers-form.php');
-        }
-    }
-    
-    if (function_exists('handle_customer_file_uploads') && handle_customer_file_uploads($customer_id)) {
+    if (handle_customer_file_uploads($customer_id)) {
         $response['success'] = true;
         $response['message'] = 'Dosyalar başarıyla yüklendi.';
         
@@ -347,11 +333,7 @@ if (isset($_POST['ajax_upload_files']) && wp_verify_nonce($_POST['file_upload_no
             );
         }
     } else {
-        if (!function_exists('handle_customer_file_uploads')) {
-            $response['message'] = 'Dosya yükleme fonksiyonu bulunamadı.';
-        } else {
-            $response['message'] = 'Dosya yüklenirken bir hata oluştu.';
-        }
+        $response['message'] = 'Dosya yüklenirken bir hata oluştu.';
     }
     
     echo json_encode($response);
@@ -492,7 +474,94 @@ function can_edit_customer_view($customer) {
     return false;
 }
 
-// Note: handle_customer_file_uploads function is defined in customers-form.php to avoid redeclaration
+/**
+ * Müşteri dosyalarını yükler
+ */
+function handle_customer_file_uploads($customer_id) {
+    global $wpdb;
+    $files_table = $wpdb->prefix . 'insurance_crm_customer_files';
+    $upload_dir = wp_upload_dir();
+    $customer_dir = $upload_dir['basedir'] . '/customer_files/' . $customer_id;
+    
+    // Klasör yoksa oluştur
+    if (!file_exists($customer_dir)) {
+        wp_mkdir_p($customer_dir);
+    }
+    
+    // Admin panelinden izin verilen dosya türlerini al
+    $settings = get_option('insurance_crm_settings', array());
+    $allowed_types = !empty($settings['file_upload_settings']['allowed_file_types']) 
+        ? $settings['file_upload_settings']['allowed_file_types'] 
+        : array('jpg', 'jpeg', 'pdf', 'docx'); // Varsayılan türler
+
+    $max_file_size = 5 * 1024 * 1024; // 5MB
+    $max_file_count = 5; // Maksimum dosya sayısı
+    
+    $file_count = count($_FILES['customer_files']['name']);
+    
+    // Dosya sayısını kontrol et
+    if ($file_count > $max_file_count) {
+        $_SESSION['crm_notice'] = '<div class="ab-notice ab-error">En fazla ' . $max_file_count . ' dosya yükleyebilirsiniz.</div>';
+        return false;
+    }
+    
+    $upload_count = 0;
+    $success = false;
+    
+    for ($i = 0; $i < $file_count; $i++) {
+        if ($_FILES['customer_files']['error'][$i] !== UPLOAD_ERR_OK) {
+            continue;
+        }
+        
+        $file_name = sanitize_file_name($_FILES['customer_files']['name'][$i]);
+        $file_tmp = $_FILES['customer_files']['tmp_name'][$i];
+        $file_size = $_FILES['customer_files']['size'][$i];
+        $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+        $file_description = isset($_POST['file_descriptions'][$i]) ? sanitize_text_field($_POST['file_descriptions'][$i]) : '';
+        
+        // Dosya türü ve boyutu kontrolü
+        if (!in_array($file_ext, $allowed_types)) {
+            continue;
+        }
+        
+        if ($file_size > $max_file_size) {
+            continue;
+        }
+        
+        // Upload sayısını kontrol et
+        if ($upload_count >= $max_file_count) {
+            $_SESSION['crm_notice'] = '<div class="ab-notice ab-warning">Maksimum ' . $max_file_count . ' dosya sınırına ulaşıldı. Diğer dosyalar yüklenmedi.</div>';
+            break;
+        }
+        
+        // Benzersiz dosya adı oluştur
+        $new_file_name = time() . '-' . $file_name;
+        $file_path = $customer_dir . '/' . $new_file_name;
+        $file_url = $upload_dir['baseurl'] . '/customer_files/' . $customer_id . '/' . $new_file_name;
+        
+        // Dosyayı taşı
+        if (move_uploaded_file($file_tmp, $file_path)) {
+            // Dosya bilgilerini veritabanına kaydet
+            $wpdb->insert(
+                $files_table,
+                array(
+                    'customer_id' => $customer_id,
+                    'file_name' => $file_name,
+                    'file_path' => $file_url,
+                    'file_type' => $file_ext,
+                    'file_size' => $file_size,
+                    'upload_date' => current_time('mysql'),
+                    'description' => $file_description
+                )
+            );
+            
+            $upload_count++;
+            $success = true;
+        }
+    }
+    
+    return $success;
+}
 
 /**
  * Müşteri dosyasını siler
@@ -633,41 +702,6 @@ function format_file_size($size) {
     <?php if (isset($_SESSION['crm_notice'])): ?>
         <?php echo $_SESSION['crm_notice']; ?>
         <?php unset($_SESSION['crm_notice']); ?>
-    <?php endif; ?>
-
-    <?php if (isset($_SESSION['show_policy_prompt']) && $_SESSION['show_policy_prompt']): ?>
-        <div class="ab-notice ab-success" style="margin-bottom: 20px;">
-            <p><strong>Müşteri başarıyla eklendi!</strong></p>
-            <p>Bu müşteri için yeni bir poliçe eklemek ister misiniz?</p>
-            <div style="margin-top: 15px;">
-                <a href="?view=policies&action=add&customer_search=<?php echo urlencode($_SESSION['new_customer_name'] ?? ''); ?>" 
-                   class="ab-btn ab-btn-primary" style="margin-right: 10px;">
-                    <i class="fas fa-plus"></i> Evet, Poliçe Ekle
-                </a>
-                <button type="button" class="ab-btn ab-btn-secondary" onclick="dismissPolicyPrompt()">
-                    <i class="fas fa-times"></i> Hayır, Teşekkürler
-                </button>
-            </div>
-        </div>
-        <script>
-        function dismissPolicyPrompt() {
-            document.querySelector('.ab-notice.ab-success').style.display = 'none';
-            // AJAX ile session değişkenini temizle
-            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: 'action=dismiss_policy_prompt&nonce=<?php echo wp_create_nonce('dismiss_policy_prompt'); ?>'
-            });
-        }
-        </script>
-        <?php 
-        // Session değişkenlerini temizle
-        unset($_SESSION['show_policy_prompt']);
-        unset($_SESSION['new_customer_id']);
-        unset($_SESSION['new_customer_name']);
-        ?>
     <?php endif; ?>
 
     <div id="ajax-response-container"></div>
@@ -1023,23 +1057,16 @@ function format_file_size($size) {
                         <div class="ab-info-label">Teklif Durumu</div>
                         <div class="ab-info-value">
                             <?php 
-                            $has_offer = isset($customer->has_offer) && $customer->has_offer == 1;
-                            if ($has_offer) {
+                            if (isset($customer->has_offer) && $customer->has_offer == 1) {
                                 echo '<span class="ab-positive">Evet</span>';
-                                echo ' <button type="button" onclick="toggleOfferStatus(0)" class="btn-small btn-outline" title="Hayır olarak değiştir">
-                                        <i class="fas fa-edit"></i>
-                                      </button>';
                             } else {
                                 echo '<span class="ab-negative">Hayır</span>';
-                                echo ' <button type="button" onclick="toggleOfferStatus(1)" class="btn-small btn-primary" title="Evet olarak değiştir">
-                                        <i class="fas fa-plus"></i> Teklif Ver
-                                      </button>';
                             }
                             ?>
                         </div>
                     </div>
                     
-                    <?php if ($has_offer): ?>
+                    <?php if (isset($customer->has_offer) && $customer->has_offer == 1): ?>
                     <div class="ab-info-item">
                         <div class="ab-info-label">Sigorta Tipi</div>
                         <div class="ab-info-value">
@@ -1059,100 +1086,6 @@ function format_file_size($size) {
                             ?>
                         </div>
                     </div>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Quote Form - Only show when toggling to offer status -->
-                <div id="quote-form-section" style="display: none;" class="modern-quote-form">
-                    <div class="quote-form-header">
-                        <div class="quote-form-icon">
-                            <i class="fas fa-file-invoice-dollar"></i>
-                        </div>
-                        <div class="quote-form-title">
-                            <h4>Müşteri Teklif Bilgileri</h4>
-                            <p>Aşağıdaki formdan müşteri için hazırlanan teklif bilgilerini kaydedin</p>
-                        </div>
-                    </div>
-                    
-                    <form id="quote-form" method="post" class="modern-form-container">
-                        <?php wp_nonce_field('update_customer_quote', 'quote_nonce'); ?>
-                        <input type="hidden" name="customer_id" value="<?php echo $customer->id; ?>">
-                        <input type="hidden" name="action" value="update_quote_status">
-                        
-                        <div class="form-grid">
-                            <div class="form-field">
-                                <label for="offer_insurance_type" class="modern-label">
-                                    <i class="fas fa-shield-alt"></i>
-                                    <span>Sigorta Türü *</span>
-                                </label>
-                                <select name="offer_insurance_type" id="offer_insurance_type" class="modern-input modern-select" required>
-                                    <option value="">Lütfen sigorta türünüzü seçiniz</option>
-                                    <option value="TSS">🏥 TSS (Tamamlayıcı Sağlık Sigortası)</option>
-                                    <option value="Kasko">🚗 Kasko</option>
-                                    <option value="Trafik">🚦 Trafik</option>
-                                    <option value="Konut">🏠 Konut</option>
-                                    <option value="İşyeri">🏢 İşyeri</option>
-                                    <option value="Hayat">👤 Hayat</option>
-                                    <option value="Bireysel Emeklilik">💰 Bireysel Emeklilik</option>
-                                    <option value="Diğer">📋 Diğer</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-field">
-                                <label for="offer_amount" class="modern-label">
-                                    <i class="fas fa-lira-sign"></i>
-                                    <span>Teklif Tutarı (₺) *</span>
-                                </label>
-                                <input type="number" name="offer_amount" id="offer_amount" class="modern-input" 
-                                       step="0.01" min="0" required placeholder="0,00" 
-                                       title="Teklif tutarını Turkish Lirası olarak giriniz">
-                            </div>
-                        </div>
-                        
-                        <div class="form-grid">
-                            <div class="form-field">
-                                <label for="offer_expiry_date" class="modern-label">
-                                    <i class="fas fa-calendar-alt"></i>
-                                    <span>Geçerlilik Tarihi</span>
-                                </label>
-                                <input type="date" name="offer_expiry_date" id="offer_expiry_date" class="modern-input" 
-                                       value="<?php echo date('Y-m-d', strtotime('+30 days')); ?>"
-                                       title="Teklifin geçerli olacağı son tarihi seçiniz">
-                            </div>
-                            
-                            <div class="form-field">
-                                <label for="offer_reminder" class="modern-label">
-                                    <i class="fas fa-bell"></i>
-                                    <span>Hatırlatma</span>
-                                </label>
-                                <select name="offer_reminder" id="offer_reminder" class="modern-input modern-select">
-                                    <option value="0">🔕 Hayır</option>
-                                    <option value="1" selected>🔔 Evet (Vade Tarihinden 1 Gün Önce)</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="form-field full-width">
-                            <label for="offer_notes" class="modern-label">
-                                <i class="fas fa-sticky-note"></i>
-                                <span>Teklif Notları</span>
-                            </label>
-                            <textarea name="offer_notes" id="offer_notes" class="modern-input modern-textarea" rows="4" 
-                                      placeholder="Teklif ile ilgili detayları, özel koşulları veya müşteriyle yapılan görüşme notlarını buraya yazabilirsiniz..."></textarea>
-                        </div>
-                        
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary btn-large">
-                                <i class="fas fa-save"></i>
-                                <span>Teklif Bilgilerini Kaydet</span>
-                            </button>
-                            <button type="button" onclick="cancelQuoteForm()" class="btn btn-secondary btn-large">
-                                <i class="fas fa-times"></i>
-                                <span>İptal Et</span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
                     
                     <div class="ab-info-item">
                         <div class="ab-info-label">Teklif Vadesi</div>
@@ -1211,6 +1144,7 @@ function format_file_size($size) {
                             <?php echo nl2br(esc_html($customer->offer_notes)); ?>
                         </div>
                     </div>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -1350,7 +1284,6 @@ function format_file_size($size) {
                                 <th>Bitiş</th>
                                 <th>Prim</th>
                                 <th>Durum</th>
-                                <th>Sigortalılar</th>
                                 <th>İşlemler</th>
                             </tr>
                         </thead>
@@ -1359,13 +1292,10 @@ function format_file_size($size) {
                                 $is_expired = strtotime($policy->end_date) < time();
                                 $is_expiring_soon = !$is_expired && (strtotime($policy->end_date) - time()) < (30 * 24 * 60 * 60); // 30 gün
                                 $row_class = $is_expired ? 'expired' : ($is_expiring_soon ? 'expiring-soon' : '');
-                                
-                                // Parse insured list with TC numbers
-                                $insured_persons = parse_insured_list_customer_view($policy->insured_list ?? '', $policy);
                             ?>
                                 <tr class="<?php echo $row_class; ?>">
                                     <td>
-                                        <a href="?view=policies&action=view&id=<?php echo $policy->id; ?>">
+                                        <a href="?view=policies&action=edit&id=<?php echo $policy->id; ?>">
                                             <?php echo esc_html($policy->policy_number); ?>
                                         </a>
                                         <?php if ($is_expired): ?>
@@ -1382,30 +1312,6 @@ function format_file_size($size) {
                                         <span class="ab-badge ab-badge-status-<?php echo esc_attr($policy->status); ?>">
                                             <?php echo esc_html($policy->status); ?>
                                         </span>
-                                    </td>
-                                    <td>
-                                        <?php if (!empty($insured_persons)): ?>
-                                            <div class="insured-list">
-                                                <?php foreach ($insured_persons as $person): 
-                                                    // Tip ikonları
-                                                    $icon = 'fas fa-user';
-                                                    if ($person['type'] === 'Müşteri') $icon = 'fas fa-user-tie';
-                                                    elseif ($person['type'] === 'Eş') $icon = 'fas fa-user-friends';
-                                                    elseif ($person['type'] === 'Çocuk') $icon = 'fas fa-child';
-                                                ?>
-                                                    <div class="insured-person">
-                                                        <span class="insured-name">
-                                                            <i class="<?php echo $icon; ?>"></i>
-                                                            <?php echo esc_html($person['name']); ?>
-                                                        </span>
-                                                        <small class="insured-tc">TC: <?php echo esc_html($person['tc']); ?></small>
-                                                        <small class="insured-type">(<?php echo esc_html($person['type']); ?>)</small>
-                                                    </div>
-                                                <?php endforeach; ?>
-                                            </div>
-                                        <?php else: ?>
-                                            <span class="text-muted">Belirtilmemiş</span>
-                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <div class="ab-actions">
@@ -1695,46 +1601,56 @@ function format_file_size($size) {
     color: #333;
 }
 
-/* Clean Customer Header */
+/* Material Design Customer Header */
 .ab-customer-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 20px;
+    margin-bottom: 32px;
     flex-wrap: wrap;
-    gap: 15px;
-    padding: 15px;
-    background: #f9f9f9;
-    border-radius: 4px;
-    border: 1px solid #e0e0e0;
+    gap: 24px;
+    padding: 24px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .ab-customer-title h1 {
-    font-size: 22px;
-    margin: 0 0 8px 0;
+    font-size: 28px;
+    margin: 0 0 12px 0;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    color: #333;
+    gap: 12px;
+    font-weight: 700;
+    color: #1a1a1a;
+    letter-spacing: -0.02em;
 }
 
 .ab-customer-title h1 i {
     color: #4caf50;
-    font-size: 18px;
+    background: rgba(76, 175, 80, 0.1);
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
 }
 
 .ab-customer-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 12px;
     align-items: center;
 }
 
 .ab-customer-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 12px;
+    padding : 20px;
     align-items: center;
 }
 
@@ -1749,29 +1665,122 @@ function format_file_size($size) {
     gap: 10px;
 }
 
-/* Clean Panel Styles */
+/* Material Design Panel Stilleri */
 .ab-panels {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
-    margin-bottom: 20px;
+    gap: 24px;
+    margin-bottom: 24px;
 }
 
 .ab-panel {
     background-color: #fff;
-    border-radius: 4px;
+    border-radius: 12px;
     overflow: hidden;
-    border: 1px solid #e0e0e0;
-    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.ab-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--panel-color, #ddd), rgba(var(--panel-color-rgb, 221, 221, 221), 0.7));
+    border-radius: 12px 12px 0 0;
 }
 
 .ab-panel:hover {
-    border-color: #ccc;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
 }
 
-/* Remove panel type specific styles - use simple uniform styling */
-.ab-panel-personal, .ab-panel-corporate, .ab-panel-family, .ab-panel-vehicle, .ab-panel-home, .ab-panel-pet, .ab-panel-documents, .ab-panel-offer {
-    background-color: #fff;
+/* Panel tiplerine göre renk şemaları, CSS değişkeni (--panel-color) kullanılır */
+.ab-panel-personal {
+    background-color: rgba(var(--panel-color-rgb, 52, 152, 219), 0.02);
+}
+.ab-panel-personal .ab-panel-header {
+    background-color: rgba(var(--panel-color-rgb, 52, 152, 219), 0.05);
+}
+.ab-panel-personal .ab-panel-header h3 i {
+    color: var(--panel-color, #3498db);
+}
+
+.ab-panel-corporate {
+    background-color: rgba(var(--panel-color-rgb, 76, 175, 80), 0.02);
+}
+.ab-panel-corporate .ab-panel-header {
+    background-color: rgba(var(--panel-color-rgb, 76, 175, 80), 0.05);
+}
+.ab-panel-corporate .ab-panel-header h3 i {
+    color: var(--panel-color, #4caf50);
+}
+
+.ab-panel-family {
+    background-color: rgba(var(--panel-color-rgb, 255, 152, 0), 0.02);
+}
+.ab-panel-family .ab-panel-header {
+    background-color: rgba(var(--panel-color-rgb, 255, 152, 0), 0.05);
+}
+.ab-panel-family .ab-panel-header h3 i {
+    color: var(--panel-color, #ff9800);
+}
+
+.ab-panel-vehicle {
+    background-color: rgba(var(--panel-color-rgb, 231, 76, 60), 0.02);
+}
+.ab-panel-vehicle .ab-panel-header {
+    background-color: rgba(var(--panel-color-rgb, 231, 76, 60), 0.05);
+}
+.ab-panel-vehicle .ab-panel-header h3 i {
+    color: var(--panel-color, #e74c3c);
+}
+
+.ab-panel-home {
+    background-color: rgba(var(--panel-color-rgb, 156, 39, 176), 0.02);
+}
+.ab-panel-home .ab-panel-header {
+    background-color: rgba(var(--panel-color-rgb, 156, 39, 176), 0.05);
+}
+.ab-panel-home .ab-panel-header h3 i {
+    color: var(--panel-color, #9c27b0);
+}
+
+/* Evcil Hayvan panel stili */
+.ab-panel-pet {
+    background-color: rgba(var(--panel-color-rgb, 233, 30, 99), 0.02);
+}
+.ab-panel-pet .ab-panel-header {
+    background-color: rgba(var(--panel-color-rgb, 233, 30, 99), 0.05);
+}
+.ab-panel-pet .ab-panel-header h3 i {
+    color: var(--panel-color, #e91e63);
+}
+
+/* Dosya Arşivi panel stili */
+.ab-panel-documents {
+    background-color: rgba(var(--panel-color-rgb, 96, 125, 139), 0.02);
+}
+.ab-panel-documents .ab-panel-header {
+    background-color: rgba(var(--panel-color-rgb, 96, 125, 139), 0.05);
+}
+.ab-panel-documents .ab-panel-header h3 i {
+    color: var(--panel-color, #607d8b);
+}
+
+/* Teklif panel stili */
+.ab-panel-offer {
+    background-color: rgba(var(--panel-color-rgb, 0, 188, 212), 0.02);
+}
+.ab-panel-offer .ab-panel-header {
+    background-color: rgba(var(--panel-color-rgb, 0, 188, 212), 0.05);
+}
+.ab-panel-offer .ab-panel-header h3 i {
+    color: var(--panel-color, #00bcd4);
 }
 
 .ab-full-panel {
@@ -1779,28 +1788,46 @@ function format_file_size($size) {
 }
 
 .ab-panel-header {
-    padding: 10px 15px;
-    background: #f5f5f5;
-    border-bottom: 1px solid #e0e0e0;
+    padding: 20px 24px 16px;
+    background: linear-gradient(135deg, rgba(var(--panel-color-rgb, 52, 152, 219), 0.08) 0%, rgba(var(--panel-color-rgb, 52, 152, 219), 0.03) 100%);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: relative;
+}
+
+.ab-panel-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 24px;
+    right: 24px;
+    height: 1px;
+    background: linear-gradient(90deg, var(--panel-color, #ddd), transparent);
+    opacity: 0.3;
 }
 
 .ab-panel-header h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 8px;
-    color: #333;
+    gap: 12px;
+    color: #1a1a1a;
+    letter-spacing: -0.02em;
 }
 
 .ab-panel-header h3 i {
-    font-size: 16px;
-    color: #666;
-}
+    font-size: 20px;
+    color: var(--panel-color, #3498db);
+    background: rgba(var(--panel-color-rgb, 52, 152, 219), 0.1);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
     justify-content: center;
 }
 
@@ -1810,21 +1837,30 @@ function format_file_size($size) {
 }
 
 .ab-panel-body {
-    padding: 15px;
+    padding: 24px;
 }
 
-/* Clean Info Grid */
+/* Material Design Info Grid */
 .ab-info-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    gap: 20px;
+    margin-bottom: 4px;
 }
 
 .ab-info-item {
-    background: #f9f9f9;
-    border-radius: 4px;
-    padding: 10px;
-    border: 1px solid #e0e0e0;
+    background: rgba(var(--panel-color-rgb, 52, 152, 219), 0.02);
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid rgba(var(--panel-color-rgb, 52, 152, 219), 0.08);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ab-info-item:hover {
+    background: rgba(var(--panel-color-rgb, 52, 152, 219), 0.04);
+    border-color: rgba(var(--panel-color-rgb, 52, 152, 219), 0.12);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .ab-full-width {
@@ -1835,23 +1871,28 @@ function format_file_size($size) {
     font-weight: 600;
     font-size: 12px;
     color: #666;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
     text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .ab-info-value {
-    font-size: 14px;
-    font-weight: normal;
-    color: #333;
+    font-size: 15px;
+    font-weight: 500;
+    color: #1a1a1a;
     line-height: 1.4;
 }
 
 .ab-info-value a {
-    color: #0073aa;
+    color: var(--panel-color, #2271b1);
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ab-info-value a:hover {
@@ -1967,82 +2008,56 @@ function format_file_size($size) {
     margin-top: 15px;
 }
 
-.ab-note-item {
-    border: 1px solid #e1e5e9;
-    border-radius: 8px;
-    padding: 16px;
+.ab-note {
+    border: 1px solid #eee;
+    border-radius: 4px;
+    padding: 15px;
     position: relative;
     background-color: #fff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.ab-note-item:hover {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
-}
-
-.ab-note-item.ab-note-positive {
+.ab-note-positive {
     border-left: 4px solid #4caf50;
-    background: linear-gradient(135deg, #fff, #f8fff8);
 }
 
-.ab-note-item.ab-note-negative {
+.ab-note-negative {
     border-left: 4px solid #f44336;
-    background: linear-gradient(135deg, #fff, #fff8f8);
 }
 
-.ab-note-item.ab-note-neutral {
+.ab-note-neutral {
     border-left: 4px solid #ff9800;
-    background: linear-gradient(135deg, #fff, #fffbf5);
 }
 
 .ab-note-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #f0f0f0;
+    align-items: center;
+    margin-bottom: 10px;
 }
 
 .ab-note-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    font-size: 12px;
-    color: #6c757d;
-    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #666;
 }
 
 .ab-note-meta i {
-    margin-right: 4px;
-    opacity: 0.7;
-}
-
-.ab-note-user, .ab-note-date {
-    background: #f8f9fa;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: 500;
+    margin-right: 3px;
 }
 
 .ab-note-content {
-    margin-bottom: 12px;
-    line-height: 1.6;
-    color: #333;
-    font-size: 14px;
-    padding: 8px 0;
+    margin-bottom: 10px;
+    line-height: 1.5;
 }
 
 .ab-note-reason {
     font-size: 12px;
-    color: #6c757d;
-    padding: 8px 12px;
-    border-top: 1px solid #e9ecef;
-    background: #f8f9fa;
-    border-radius: 4px;
-    margin-top: 8px;
+    color: #666;
+    padding-top: 8px;
+    border-top: 1px dashed #eee;
 }
 
 /* Badge Stilleri */
@@ -3614,49 +3629,6 @@ jQuery(document).ready(function($) {
         });
     }
     
-    // Quote toggle functionality
-    window.toggleOfferStatus = function(newStatus) {
-        if (newStatus === 1) {
-            // Show quote form
-            document.getElementById('quote-form-section').style.display = 'block';
-            document.getElementById('quote-form-section').scrollIntoView({ behavior: 'smooth' });
-        } else {
-            // Change status to No without showing form
-            if (confirm('Teklif durumunu "Hayır" olarak değiştirmek istediğinizden emin misiniz?')) {
-                updateOfferStatusDirectly(0);
-            }
-        }
-    };
-    
-    window.cancelQuoteForm = function() {
-        document.getElementById('quote-form-section').style.display = 'none';
-    };
-    
-    function updateOfferStatusDirectly(status) {
-        const formData = new FormData();
-        formData.append('action', 'toggle_offer_status');
-        formData.append('customer_id', '<?php echo $customer->id; ?>');
-        formData.append('has_offer', status);
-        formData.append('nonce', '<?php echo wp_create_nonce("toggle_offer_status"); ?>');
-        
-        fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                window.location.reload();
-            } else {
-                alert('Hata: ' + (data.data || 'Bilinmeyen hata'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Bir hata oluştu: ' + error.message);
-        });
-    }
-    
     // Hatırlatma görevi oluşturma fonksiyonu
     window.createReminderTask = function(customerId) {
         if (confirm('Bu müşteri için hatırlatma görevi oluşturulsun mu?')) {
@@ -3681,595 +3653,5 @@ jQuery(document).ready(function($) {
             form.submit();
         }
     };
-    
-    // AJAX Quote Form Handler
-    $('#quote-form').on('submit', function(e) {
-        e.preventDefault();
-        
-        var $form = $(this);
-        var $submitBtn = $form.find('button[type="submit"]');
-        var originalBtnText = $submitBtn.html();
-        
-        // Show loading state
-        $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...');
-        
-        // Add AJAX indicator
-        var formData = new FormData(this);
-        formData.append('ajax', '1');
-        
-        $.ajax({
-            url: window.location.href,
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                try {
-                    // Try to parse as JSON first (for AJAX responses)
-                    if (typeof response === 'string' && response.trim().startsWith('{')) {
-                        var data = JSON.parse(response);
-                        if (data.success) {
-                            showQuoteMessage('Teklif bilgileri başarıyla kaydedildi!', 'success');
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 1500);
-                        } else {
-                            showQuoteMessage('Hata: ' + (data.data || 'Bilinmeyen hata'), 'error');
-                        }
-                    } else {
-                        // For non-JSON responses, assume success if no error messages
-                        if (response.indexOf('ab-error') === -1) {
-                            showQuoteMessage('Teklif bilgileri başarıyla kaydedildi!', 'success');
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 1500);
-                        } else {
-                            showQuoteMessage('Teklif kaydedilirken hata oluştu.', 'error');
-                        }
-                    }
-                } catch (error) {
-                    console.error('Response parsing error:', error);
-                    showQuoteMessage('Teklif bilgileri başarıyla kaydedildi!', 'success');
-                    setTimeout(function() {
-                        window.location.reload();
-                    }, 1500);
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('AJAX Error:', error);
-                showQuoteMessage('Bağlantı hatası: ' + error, 'error');
-            },
-            complete: function() {
-                // Restore button state
-                $submitBtn.prop('disabled', false).html(originalBtnText);
-            }
-        });
-    });
-    
-    function showQuoteMessage(message, type) {
-        // Remove any existing messages
-        $('.quote-message').remove();
-        
-        // Create message element
-        var messageClass = type === 'success' ? 'ab-notice ab-success' : 'ab-notice ab-error';
-        var messageHtml = '<div class="quote-message ' + messageClass + '" style="margin: 15px 0; padding: 12px; border-radius: 6px;">' + 
-                         '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-triangle') + '"></i> ' + 
-                         message + '</div>';
-        
-        // Insert message after form header
-        $('.quote-form-header').after(messageHtml);
-        
-        // Auto-remove error messages after 5 seconds
-        if (type === 'error') {
-            setTimeout(function() {
-                $('.quote-message').fadeOut(300, function() {
-                    $(this).remove();
-                });
-            }, 5000);
-        }
-    }
 });
 </script>
-
-<style>
-/* Insured people display styling for customers-view.php */
-.insured-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-width: 250px;
-}
-
-.insured-person {
-    background: #f8f9fa;
-    padding: 8px 10px;
-    border-radius: 6px;
-    border-left: 3px solid #007cba;
-    font-size: 12px;
-    line-height: 1.3;
-}
-
-.insured-name {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 3px;
-}
-
-.insured-name i {
-    color: #007cba;
-    font-size: 11px;
-}
-
-.insured-tc {
-    display: block;
-    color: #6c757d;
-    font-size: 11px;
-    background: #e9ecef;
-    padding: 2px 6px;
-    border-radius: 3px;
-    margin: 2px 0;
-    display: inline-block;
-}
-
-.insured-type {
-    color: #6c757d;
-    font-size: 11px;
-    font-style: italic;
-}
-
-/* Responsive adjustments */
-@media (max-width: 1200px) {
-    .insured-list {
-        max-width: 200px;
-    }
-    
-    .insured-person {
-        padding: 6px 8px;
-        font-size: 11px;
-    }
-}
-
-@media (max-width: 768px) {
-    .ab-crm-table {
-        font-size: 12px;
-    }
-    
-    .insured-list {
-        max-width: 150px;
-    }
-    
-    .insured-person {
-        padding: 4px 6px;
-        font-size: 10px;
-    }
-    
-    .insured-name {
-        margin-bottom: 2px;
-    }
-    
-    .insured-tc {
-        font-size: 9px;
-        padding: 1px 4px;
-    }
-    
-    .insured-type {
-        font-size: 9px;
-    }
-}
-</style>
-
-<style>
-/* Enhanced Corporate Customer View Styles */
-.ab-panels {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 20px;
-    margin: 20px 0;
-}
-
-.ab-panel {
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.ab-panel:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
-}
-
-.ab-panel-header {
-    background: linear-gradient(135deg, var(--panel-color, #3498db) 0%, rgba(var(--panel-color-rgb, 52, 152, 219), 0.8) 100%);
-    color: white;
-    padding: 18px 24px;
-    font-weight: 600;
-    border-bottom: none;
-    position: relative;
-}
-
-.ab-panel-header::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
-    pointer-events: none;
-}
-
-.ab-panel-header h3 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    position: relative;
-    z-index: 1;
-}
-
-.ab-panel-header h3 i {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    font-size: 14px;
-}
-
-.ab-panel-body {
-    padding: 24px;
-}
-
-.ab-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 16px;
-}
-
-.ab-info-item {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 16px;
-    transition: all 0.2s ease;
-}
-
-.ab-info-item:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
-}
-
-.ab-info-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-}
-
-.ab-info-value {
-    font-size: 14px;
-    font-weight: 500;
-    color: #1e293b;
-    line-height: 1.4;
-}
-
-.ab-info-value a {
-    color: #3b82f6;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: color 0.2s ease;
-}
-
-.ab-info-value a:hover {
-    color: #1d4ed8;
-}
-
-.no-value {
-    color: #9ca3af;
-    font-style: italic;
-}
-
-/* Enhanced Corporate Quote Form Styles */
-.modern-quote-form {
-    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
-    border-radius: 20px;
-    padding: 0;
-    margin: 20px 0;
-    box-shadow: 0 20px 50px rgba(30, 64, 175, 0.15), 0 10px 30px rgba(59, 130, 246, 0.1);
-    overflow: hidden;
-    position: relative;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.modern-quote-form::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-        radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.12) 0%, transparent 50%),
-        radial-gradient(ellipse at bottom right, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
-    pointer-events: none;
-}
-
-.quote-form-header {
-    background: rgba(255, 255, 255, 0.98);
-    padding: 28px 32px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    border-bottom: 1px solid rgba(59, 130, 246, 0.1);
-    backdrop-filter: blur(10px);
-    position: relative;
-    z-index: 1;
-}
-
-.quote-form-header::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 32px;
-    right: 32px;
-    height: 2px;
-    background: linear-gradient(90deg, #3b82f6 0%, #1e40af 100%);
-}
-
-.quote-form-icon {
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 24px;
-    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
-    position: relative;
-}
-
-.quote-form-icon::before {
-    content: '';
-    position: absolute;
-    top: 1px;
-    left: 1px;
-    right: 1px;
-    bottom: 1px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
-    border-radius: 15px;
-    pointer-events: none;
-}
-
-.quote-form-title h4 {
-    margin: 0 0 6px 0;
-    font-size: 20px;
-    font-weight: 700;
-    color: #1e293b;
-    letter-spacing: -0.3px;
-}
-
-.quote-form-title p {
-    margin: 0;
-    color: #64748b;
-    font-size: 14px;
-    line-height: 1.4;
-    font-weight: 500;
-}
-
-.modern-form-container {
-    background: rgba(255, 255, 255, 0.98);
-    padding: 32px;
-    position: relative;
-    z-index: 1;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 20px;
-}
-
-.form-field {
-    position: relative;
-}
-
-.form-field.full-width {
-    grid-column: 1 / -1;
-}
-
-.modern-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-    font-weight: 600;
-    font-size: 14px;
-    color: #1e293b;
-    letter-spacing: 0.2px;
-}
-
-.modern-label i {
-    color: #3b82f6;
-    width: 16px;
-    text-align: center;
-    font-size: 14px;
-}
-
-.modern-input {
-    width: 100%;
-    padding: 14px 16px;
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    font-size: 14px;
-    background: #ffffff;
-    transition: all 0.3s ease;
-    box-sizing: border-box;
-    font-weight: 500;
-    color: #1e293b;
-}
-
-.modern-input:focus {
-    outline: none;
-    border-color: #3b82f6;
-    background: #ffffff;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    transform: translateY(-1px);
-}
-
-.modern-input:hover {
-    border-color: #cbd5e1;
-    background: #ffffff;
-}
-
-.modern-select {
-    cursor: pointer;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 12px center;
-    background-repeat: no-repeat;
-    background-size: 16px;
-    padding-right: 40px;
-}
-
-.modern-textarea {
-    resize: vertical;
-    min-height: 100px;
-    font-family: inherit;
-    line-height: 1.5;
-}
-
-.form-actions {
-    display: flex;
-    gap: 20px;
-    justify-content: flex-end;
-    padding-top: 32px;
-    border-top: 2px solid #ecf0f1;
-    margin-top: 40px;
-    position: relative;
-}
-
-.form-actions::before {
-    content: '';
-    position: absolute;
-    top: -1px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #3498db 0%, #2980b9 100%);
-    opacity: 0.3;
-}
-
-.btn-large {
-    padding: 18px 36px;
-    font-size: 16px;
-    font-weight: 700;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border: none;
-    cursor: pointer;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    text-decoration: none;
-    min-width: 180px;
-    justify-content: center;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    position: relative;
-    overflow: hidden;
-}
-
-.btn-large::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
-}
-
-.btn-large:hover::before {
-    left: 100%;
-}
-
-.btn-primary.btn-large {
-    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-    color: white;
-    box-shadow: 
-        0 8px 25px rgba(52, 152, 219, 0.3),
-        0 4px 15px rgba(41, 128, 185, 0.2);
-}
-
-.btn-primary.btn-large:hover {
-    transform: translateY(-3px);
-    box-shadow: 
-        0 12px 35px rgba(52, 152, 219, 0.4),
-        0 8px 20px rgba(41, 128, 185, 0.3);
-    background: linear-gradient(135deg, #2980b9 0%, #3498db 100%);
-}
-
-.btn-secondary.btn-large {
-    background: linear-gradient(135deg, #ecf0f1 0%, #bdc3c7 100%);
-    color: #2c3e50;
-    border: 2px solid #bdc3c7;
-    box-shadow: 0 4px 15px rgba(189, 195, 199, 0.3);
-}
-}
-
-.btn-secondary.btn-large:hover {
-    background: #e9ecef;
-    transform: translateY(-1px);
-}
-
-/* Responsive Design for Quote Form */
-@media (max-width: 768px) {
-    .form-grid {
-        grid-template-columns: 1fr;
-        gap: 20px;
-    }
-    
-    .quote-form-header {
-        padding: 20px;
-        flex-direction: column;
-        text-align: center;
-        gap: 15px;
-    }
-    
-    .quote-form-icon {
-        width: 50px;
-        height: 50px;
-        font-size: 20px;
-    }
-    
-    .modern-form-container {
-        padding: 20px;
-    }
-    
-    .form-actions {
-        flex-direction: column;
-    }
-    
-    .btn-large {
-        width: 100%;
-    }
-}
-</style>
