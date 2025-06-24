@@ -119,28 +119,32 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'add_task') {
 }
 
 // Kullanıcıları çek (görev atanabilir kişiler)
-$users = get_users([
-    'meta_key' => 'insurance_crm_role',
-    'meta_value' => '',
-    'meta_compare' => '!='
-]);
+$users = $wpdb->get_results("
+    SELECT DISTINCT u.ID, u.display_name, r.first_name, r.last_name, r.role_name
+    FROM {$wpdb->users} u
+    INNER JOIN {$wpdb->prefix}insurance_crm_representatives r ON u.ID = r.user_id
+    WHERE r.status = 'active'
+    ORDER BY r.first_name, r.last_name
+");
 
-// Eğer hiç kullanıcı bulunamadıysa, tüm CRM temsilcilerini al
-if (empty($users)) {
-    $users = $wpdb->get_results("
-        SELECT DISTINCT u.ID, u.display_name, r.role_name
-        FROM {$wpdb->users} u
-        INNER JOIN {$wpdb->prefix}insurance_crm_representatives r ON u.ID = r.user_id
-        WHERE r.user_id IS NOT NULL
-    ");
-    
-    // WordPress user nesnelerine dönüştür
-    foreach ($users as &$user) {
-        $wp_user = get_userdata($user->ID);
-        if ($wp_user) {
-            $user = $wp_user;
+// WordPress user nesnelerine dönüştür
+foreach ($users as &$user) {
+    $wp_user = get_userdata($user->ID);
+    if ($wp_user) {
+        $user->display_name = $wp_user->display_name;
+        if (empty($user->display_name)) {
+            $user->display_name = $user->first_name . ' ' . $user->last_name;
         }
     }
+}
+
+// Eğer hiç kullanıcı bulunamadıysa alternatif yöntem dene
+if (empty($users)) {
+    $users = get_users([
+        'meta_key' => 'insurance_crm_role',
+        'meta_value' => '',
+        'meta_compare' => '!='
+    ]);
 }
 
 // Müşterileri çek
@@ -568,16 +572,21 @@ error_log("Task form - Found " . count($customers) . " customers");
                     <label for="assigned_to" class="required">Atanacak Kişi</label>
                     <select id="assigned_to" name="assigned_to" class="ab-select" required>
                         <option value="">Kişi Seçin</option>
-                        <?php foreach ($users as $user): 
-                            $role_name = get_user_meta($user->ID, 'insurance_crm_role_name', true);
-                        ?>
-                            <option value="<?php echo $user->ID; ?>">
-                                <?php echo esc_html($user->display_name); ?> 
-                                <?php if ($role_name): ?>
-                                    (<?php echo esc_html($role_name); ?>)
-                                <?php endif; ?>
-                            </option>
-                        <?php endforeach; ?>
+                        <?php if (!empty($users)): ?>
+                            <?php foreach ($users as $user): 
+                                $role_name = !empty($user->role_name) ? $user->role_name : get_user_meta($user->ID, 'insurance_crm_role_name', true);
+                                $display_name = !empty($user->display_name) ? $user->display_name : $user->first_name . ' ' . $user->last_name;
+                            ?>
+                                <option value="<?php echo $user->ID; ?>">
+                                    <?php echo esc_html($display_name); ?> 
+                                    <?php if ($role_name): ?>
+                                        (<?php echo esc_html($role_name); ?>)
+                                    <?php endif; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <option value="" disabled>Müşteri temsilcisi bulunamadı</option>
+                        <?php endif; ?>
                     </select>
                 </div>
                 

@@ -356,6 +356,53 @@ if (isset($_POST['ajax_delete_file']) && wp_verify_nonce($_POST['file_delete_non
     exit;
 }
 
+// AJAX Teklif Güncelleme İşlemi
+if (isset($_POST['ajax_update_offer']) && wp_verify_nonce($_POST['offer_nonce'], 'update_customer_offer')) {
+    // Output buffer'ı temizle
+    if (ob_get_level()) {
+        ob_clean();
+    }
+    
+    $response = array('success' => false, 'message' => '');
+    $customer_id = intval($_POST['customer_id']);
+    
+    // Verileri sanitize et
+    $offer_data = array(
+        'has_offer' => 1,
+        'offer_insurance_type' => sanitize_text_field($_POST['offer_insurance_type']),
+        'offer_amount' => floatval($_POST['offer_amount']),
+        'offer_expiry_date' => sanitize_text_field($_POST['offer_expiry_date']),
+        'offer_reminder' => intval($_POST['offer_reminder']),
+        'offer_notes' => sanitize_textarea_field($_POST['offer_notes'])
+    );
+    
+    // Müşteri verisini güncelle
+    $update_result = $wpdb->update(
+        $customers_table,
+        $offer_data,
+        array('id' => $customer_id),
+        array('%d', '%s', '%f', '%s', '%d', '%s'),
+        array('%d')
+    );
+    
+    if ($update_result !== false) {
+        $response['success'] = true;
+        $response['message'] = 'Teklif bilgileri başarıyla kaydedildi.';
+        
+        // Hatırlatma görevi oluştur
+        if (!empty($offer_data['offer_reminder']) && !empty($offer_data['offer_expiry_date'])) {
+            create_offer_reminder_task($customer_id, $offer_data);
+        }
+    } else {
+        $response['message'] = 'Teklif bilgileri kaydedilirken bir hata oluştu.';
+    }
+    
+    // JSON yanıt gönder
+    header('Content-Type: application/json');
+    echo json_encode($response);
+    exit;
+}
+
 // Not ekleme işlemi
 if (isset($_POST['add_note']) && isset($_POST['note_nonce']) && wp_verify_nonce($_POST['note_nonce'], 'add_customer_note')) {
     $note_data = array(
@@ -1050,8 +1097,79 @@ function format_file_size($size) {
         <div class="ab-panel ab-panel-offer" style="--panel-color: <?php echo esc_attr($offer_color); ?>">
             <div class="ab-panel-header">
                 <h3><i class="fas fa-file-invoice-dollar"></i> Teklif Verildi mi?</h3>
+                <?php if (!isset($customer->has_offer) || $customer->has_offer != 1): ?>
+                <div class="ab-panel-actions">
+                    <button type="button" class="ab-btn ab-btn-sm ab-btn-primary" id="toggle-offer-form">
+                        <i class="fas fa-plus"></i> Teklif Ver
+                    </button>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="ab-panel-body">
+                
+                <!-- Teklif Ekleme Formu -->
+                <?php if (!isset($customer->has_offer) || $customer->has_offer != 1): ?>
+                <div class="ab-offer-form" id="offer-form" style="display:none;">
+                    <form id="offer-form-data">
+                        <?php wp_nonce_field('update_customer_offer', 'offer_nonce'); ?>
+                        <input type="hidden" name="customer_id" value="<?php echo $customer_id; ?>">
+                        <input type="hidden" name="action" value="update_offer">
+                        
+                        <div class="ab-form-row">
+                            <div class="ab-form-group">
+                                <label for="offer_insurance_type">Sigorta Türü *</label>
+                                <select name="offer_insurance_type" id="offer_insurance_type" required>
+                                    <option value="">Seçiniz</option>
+                                    <option value="Kasko">Kasko</option>
+                                    <option value="Trafik">Trafik</option>
+                                    <option value="Dask">Dask</option>
+                                    <option value="Konut">Konut</option>
+                                    <option value="İşyeri">İşyeri</option>
+                                    <option value="Sağlık">Sağlık</option>
+                                    <option value="Hayat">Hayat</option>
+                                    <option value="Seyahat">Seyahat</option>
+                                    <option value="Diğer">Diğer</option>
+                                </select>
+                            </div>
+                            <div class="ab-form-group">
+                                <label for="offer_amount">Teklif Tutarı (₺) *</label>
+                                <input type="number" name="offer_amount" id="offer_amount" step="0.01" min="0" required>
+                            </div>
+                        </div>
+                        
+                        <div class="ab-form-row">
+                            <div class="ab-form-group">
+                                <label for="offer_expiry_date">Geçerlilik Tarihi *</label>
+                                <input type="date" name="offer_expiry_date" id="offer_expiry_date" required>
+                            </div>
+                            <div class="ab-form-group">
+                                <label for="offer_reminder">Hatırlatma</label>
+                                <select name="offer_reminder" id="offer_reminder">
+                                    <option value="0">Hayır</option>
+                                    <option value="1" selected>Evet</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="ab-form-row">
+                            <div class="ab-form-group ab-full-width">
+                                <label for="offer_notes">Teklif Notları</label>
+                                <textarea name="offer_notes" id="offer_notes" rows="3" placeholder="Teklif ile ilgili detaylar, özel koşullar veya müşteriyle yapılan görüşme notlarını buraya yazabilirsiniz..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="ab-form-actions">
+                            <button type="submit" class="ab-btn ab-btn-primary" id="save-offer-btn">
+                                <i class="fas fa-save"></i> Teklif Bilgilerini Kaydet
+                            </button>
+                            <button type="button" class="ab-btn ab-btn-secondary" id="cancel-offer-form">
+                                <i class="fas fa-times"></i> İptal Et
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <?php endif; ?>
+                
                 <div class="ab-info-grid">
                     <div class="ab-info-item">
                         <div class="ab-info-label">Teklif Durumu</div>
@@ -3653,5 +3771,120 @@ jQuery(document).ready(function($) {
             form.submit();
         }
     };
+
+    // Teklif formu toggle
+    $('#toggle-offer-form').on('click', function() {
+        $('#offer-form').slideToggle();
+        var btn = $(this);
+        if ($('#offer-form').is(':visible')) {
+            btn.html('<i class="fas fa-minus"></i> Kapat');
+            // Bugünün tarihini default olarak ayarla
+            var today = new Date();
+            var nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+            $('#offer_expiry_date').val(nextMonth.toISOString().split('T')[0]);
+        } else {
+            btn.html('<i class="fas fa-plus"></i> Teklif Ver');
+        }
+    });
+
+    // Teklif formu iptal
+    $('#cancel-offer-form').on('click', function() {
+        $('#offer-form').slideUp();
+        $('#toggle-offer-form').html('<i class="fas fa-plus"></i> Teklif Ver');
+        $('#offer-form-data')[0].reset();
+    });
+
+    // Teklif formu gönder
+    $('#offer-form-data').on('submit', function(e) {
+        e.preventDefault();
+        
+        var $btn = $('#save-offer-btn');
+        var originalText = $btn.html();
+        
+        // Form verilerini al
+        var formData = new FormData(this);
+        formData.append('has_offer', '1');
+        formData.append('ajax_update_offer', '1');
+        
+        // Butonu devre dışı bırak
+        $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...');
+        
+        $.ajax({
+            url: window.location.href,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                try {
+                    // Clean response if needed
+                    var cleanResponse = response.trim();
+                    if (cleanResponse.charAt(0) !== '{') {
+                        var jsonStart = cleanResponse.indexOf('{');
+                        if (jsonStart !== -1) {
+                            cleanResponse = cleanResponse.substring(jsonStart);
+                        }
+                    }
+                    
+                    var data = JSON.parse(cleanResponse);
+                    
+                    if (data.success) {
+                        // Başarılı - sayfayı yenile
+                        showOfferResponse(data.message, 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showOfferResponse(data.message, 'error');
+                    }
+                } catch (e) {
+                    console.error('Response parsing error:', e);
+                    console.log('Raw response:', response);
+                    
+                    // Eğer response'da başarı mesajı varsa başarılı kabul et
+                    if (response.includes('başarıyla') || response.includes('kaydedildi')) {
+                        showOfferResponse('Teklif bilgileri kaydedildi.', 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        showOfferResponse('Teklif kaydedildi ancak sayfa güncellemesi gerekiyor.', 'warning');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 2000);
+                    }
+                }
+                
+                // Butonu tekrar etkinleştir
+                $btn.prop('disabled', false).html(originalText);
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                showOfferResponse('Sunucu hatası. Lütfen daha sonra tekrar deneyin.', 'error');
+                
+                // Butonu tekrar etkinleştir
+                $btn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    function showOfferResponse(message, type) {
+        // Mevcut mesajları temizle
+        $('.ab-offer-response').remove();
+        
+        // Yeni mesaj oluştur
+        var alertClass = 'ab-notice ab-' + type;
+        var alertHtml = '<div class="ab-offer-response ' + alertClass + '">' + message + '</div>';
+        
+        // Mesajı forma ekle
+        $('#offer-form').prepend(alertHtml);
+        
+        // Mesajı otomatik kaldır
+        setTimeout(function() {
+            $('.ab-offer-response').fadeOut(500, function() {
+                $(this).remove();
+            });
+        }, 5000);
+    }
 });
 </script>
