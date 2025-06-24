@@ -10,9 +10,9 @@
  * Plugin Name: Insurance CRM
  * Plugin URI: https://github.com/anadolubirlik/insurance-crm
  * Description: Sigorta acenteleri için müşteri, poliçe ve görev yönetim sistemi.
- * Version: 1.4.9
+ * Version: 1.6.6
  * Pagename: insurance-crm.php
- * Page Version: 1.4.9
+ * Page Version: 1.6.6
  * Author: Mehmet BALKAY | Anadolu Birlik
  * Author URI: https://www.balkay.net
  */
@@ -142,6 +142,16 @@ function force_update_crm_db() {
         error_log('offer_reminder column added to customers table');
     }
     
+    // **NEW**: Add gross_premium column for Kasko/Trafik policies
+    $policies_table = $wpdb->prefix . 'insurance_crm_policies';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$policies_table'") == $policies_table) {
+        $gross_premium_exists = $wpdb->get_results("SHOW COLUMNS FROM `{$policies_table}` LIKE 'gross_premium'");
+        if (empty($gross_premium_exists)) {
+            $wpdb->query("ALTER TABLE `{$policies_table}` ADD COLUMN `gross_premium` DECIMAL(10,2) DEFAULT NULL AFTER `premium_amount`");
+            error_log('gross_premium column added to policies table');
+        }
+    }
+    
     // **NEW**: Add personal information fields to representatives table
     $representatives_table = $wpdb->prefix . 'insurance_crm_representatives';
     if ($wpdb->get_var("SHOW TABLES LIKE '$representatives_table'") == $representatives_table) {
@@ -173,7 +183,7 @@ add_action('init', 'force_update_crm_db', 5);
 /**
  * Plugin version.
  */
-define('INSURANCE_CRM_VERSION', '1.1.3');
+define('INSURANCE_CRM_VERSION', '1.5.7');
 
 /**
  * Plugin base path
@@ -1528,6 +1538,336 @@ function insurance_crm_ajax_handler() {
 add_action('wp_ajax_insurance_crm_ajax', 'insurance_crm_ajax_handler');
 
 /**
+ * AJAX handler for fixing all customer names
+ */
+function insurance_crm_fix_all_names() {
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'fix_names_nonce')) {
+        wp_send_json_error('Security check failed');
+    }
+    
+    // Check user permissions - Only Patron and Müdür roles
+    $current_user = wp_get_current_user();
+    if (!in_array('insurance_representative', (array)$current_user->roles)) {
+        wp_send_json_error('Insufficient permissions');
+    }
+    
+    // Get representative info and check role
+    global $wpdb;
+    $reps_table = $wpdb->prefix . 'insurance_crm_representatives';
+    $current_rep = $wpdb->get_row($wpdb->prepare(
+        "SELECT role FROM $reps_table WHERE user_id = %d", 
+        $current_user->ID
+    ));
+    
+    // Only Patron (role 1) and Müdür (role 2) can fix names
+    if (!$current_rep || !in_array($current_rep->role, [1, 2])) {
+        wp_send_json_error('Bu işlem için Patron veya Müdür yetkisi gereklidir.');
+    }
+    
+    global $wpdb;
+    $customers_table = $wpdb->prefix . 'insurance_crm_customers';
+    
+    // Get all customers
+    $customers = $wpdb->get_results("SELECT id, first_name, last_name, spouse_name, children_names, company_name FROM $customers_table");
+    
+    $fixed_count = 0;
+    
+    foreach ($customers as $customer) {
+        $updates = array();
+        
+        // Fix first name
+        if (!empty($customer->first_name)) {
+            $fixed_first_name = formatName($customer->first_name);
+            if ($fixed_first_name !== $customer->first_name) {
+                $updates['first_name'] = $fixed_first_name;
+            }
+        }
+        
+        // Fix last name
+        if (!empty($customer->last_name)) {
+            $fixed_last_name = formatLastName($customer->last_name);
+            if ($fixed_last_name !== $customer->last_name) {
+                $updates['last_name'] = $fixed_last_name;
+            }
+        }
+        
+        // Fix spouse name
+        if (!empty($customer->spouse_name)) {
+            $fixed_spouse_name = formatName($customer->spouse_name);
+            if ($fixed_spouse_name !== $customer->spouse_name) {
+                $updates['spouse_name'] = $fixed_spouse_name;
+            }
+        }
+        
+        // Fix children names
+        if (!empty($customer->children_names)) {
+            $children_names = explode(',', $customer->children_names);
+            $fixed_children_names = array();
+            $changed = false;
+            
+            foreach ($children_names as $child_name) {
+                $child_name = trim($child_name);
+                $fixed_child_name = formatName($child_name);
+                $fixed_children_names[] = $fixed_child_name;
+                if ($fixed_child_name !== $child_name) {
+                    $changed = true;
+                }
+            }
+            
+            if ($changed) {
+                $updates['children_names'] = implode(', ', $fixed_children_names);
+            }
+        }
+        
+        // Fix company name
+        if (!empty($customer->company_name)) {
+            $fixed_company_name = formatName($customer->company_name);
+            if ($fixed_company_name !== $customer->company_name) {
+                $updates['company_name'] = $fixed_company_name;
+            }
+        }
+        
+        // Update if there are changes
+        if (!empty($updates)) {
+            $wpdb->update($customers_table, $updates, array('id' => $customer->id));
+            $fixed_count++;
+        }
+    }
+    
+    wp_send_json_success(array('fixed_count' => $fixed_count));
+}
+
+/**
+ * Helper functions for name formatting
+ */
+function formatName($name) {
+    if (empty($name)) return $name;
+    
+    // Convert to lowercase and split by spaces
+    $words = explode(' ', mb_strtolower(trim($name), 'UTF-8'));
+    $formatted_words = array();
+    
+    foreach ($words as $word) {
+        if (!empty($word)) {
+            // Capitalize first letter, handle Turkish characters
+            $formatted_word = mb_strtoupper(mb_substr($word, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($word, 1, null, 'UTF-8');
+            $formatted_words[] = $formatted_word;
+        }
+    }
+    
+    return implode(' ', $formatted_words);
+}
+
+function formatLastName($name) {
+    if (empty($name)) return $name;
+    
+    // Convert to uppercase, handle Turkish characters
+    return mb_strtoupper(trim($name), 'UTF-8');
+}
+
+add_action('wp_ajax_fix_all_names', 'insurance_crm_fix_all_names');
+
+/**
+ * AJAX handler for toggling offer status
+ */
+function insurance_crm_toggle_offer_status() {
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'toggle_offer_status')) {
+        wp_send_json_error('Security check failed');
+    }
+    
+    global $wpdb;
+    $customers_table = $wpdb->prefix . 'insurance_crm_customers';
+    $reps_table = $wpdb->prefix . 'insurance_crm_representatives';
+    $current_user_id = get_current_user_id();
+    
+    $customer_id = intval($_POST['customer_id']);
+    $has_offer = intval($_POST['has_offer']);
+    
+    // Get customer data to check permissions
+    $customer = $wpdb->get_row($wpdb->prepare("SELECT * FROM $customers_table WHERE id = %d", $customer_id));
+    
+    if (!$customer) {
+        wp_send_json_error('Müşteri bulunamadı');
+    }
+    
+    // Check permissions using the same function as the view
+    // Administrator always has permission
+    $can_edit = false;
+    if (current_user_can('administrator')) {
+        $can_edit = true;
+    } else {
+        // Get representative data
+        $rep_data = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $reps_table WHERE user_id = %d",
+            $current_user_id
+        ));
+        
+        if ($rep_data) {
+            // Role-based permission check
+            if ($rep_data->role == 1) { // Patron
+                $can_edit = true;
+            } elseif ($rep_data->role == 2 && $rep_data->customer_edit == 1) { // Müdür with edit permission
+                $can_edit = true;
+            } elseif ($rep_data->role == 3 && $rep_data->customer_edit == 1) { // Müdür Yardımcısı with edit permission
+                $can_edit = true;
+            } elseif ($rep_data->role == 4 && $rep_data->customer_edit == 1) { // Ekip Lideri with edit permission
+                // Team leader can only edit their team's customers
+                if (function_exists('get_team_members')) {
+                    $members = get_team_members($current_user_id);
+                    $can_edit = in_array($customer->representative_id, $members);
+                } else {
+                    $can_edit = ($customer->representative_id == $rep_data->id);
+                }
+            } elseif ($rep_data->role == 5 && $rep_data->customer_edit == 1) { // Temsilci with edit permission
+                $can_edit = ($customer->representative_id == $rep_data->id);
+            }
+        }
+    }
+    
+    if (!$can_edit) {
+        wp_send_json_error('Bu müşteriyi düzenleme yetkiniz yok');
+    }
+    
+    $update_data = array('has_offer' => $has_offer);
+    
+    // If setting to no offer, clear offer fields
+    if ($has_offer == 0) {
+        $update_data['offer_insurance_type'] = null;
+        $update_data['offer_amount'] = null;
+        $update_data['offer_expiry_date'] = null;
+        $update_data['offer_notes'] = null;
+        $update_data['offer_reminder'] = 0;
+    }
+    
+    $result = $wpdb->update($customers_table, $update_data, array('id' => $customer_id));
+    
+    if ($result !== false) {
+        wp_send_json_success('Teklif durumu güncellendi');
+    } else {
+        wp_send_json_error('Güncelleme hatası');
+    }
+}
+
+add_action('wp_ajax_toggle_offer_status', 'insurance_crm_toggle_offer_status');
+
+/**
+ * AJAX handler for customer search in task form
+ */
+function insurance_crm_search_customers_for_task() {
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'customer_search')) {
+        wp_send_json_error('Security check failed');
+    }
+    
+    // Check user permissions
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error('Insufficient permissions');
+    }
+    
+    global $wpdb;
+    $customers_table = $wpdb->prefix . 'insurance_crm_customers';
+    
+    $search_term = sanitize_text_field($_POST['search_term']);
+    
+    // Check if search term is provided
+    if (empty($search_term)) {
+        wp_send_json_error('Search term is required');
+    }
+    
+    // Build search query
+    $search_query = "
+        SELECT id, first_name, last_name, tc_identity, tax_number, phone, company_name,
+               CASE 
+                   WHEN company_name IS NOT NULL AND company_name != '' THEN 'kurumsal'
+                   ELSE 'bireysel'
+               END as customer_type
+        FROM $customers_table 
+        WHERE (
+            CONCAT(first_name, ' ', last_name) LIKE %s
+            OR tc_identity LIKE %s
+            OR tax_number LIKE %s
+            OR phone LIKE %s
+            OR company_name LIKE %s
+        )
+        AND status = 'aktif'
+        ORDER BY 
+            CASE 
+                WHEN company_name IS NOT NULL AND company_name != '' THEN company_name
+                ELSE CONCAT(first_name, ' ', last_name)
+            END
+        LIMIT 10
+    ";
+    
+    $search_param = '%' . $wpdb->esc_like($search_term) . '%';
+    $customers = $wpdb->get_results($wpdb->prepare(
+        $search_query,
+        $search_param,
+        $search_param,
+        $search_param,
+        $search_param,
+        $search_param
+    ));
+    
+    // Check for database errors
+    if ($wpdb->last_error) {
+        error_log('Customer search database error: ' . $wpdb->last_error);
+        wp_send_json_error('Database error occurred');
+    }
+    
+    if ($customers) {
+        wp_send_json_success($customers);
+    } else {
+        wp_send_json_error('No customers found');
+    }
+}
+
+add_action('wp_ajax_search_customers_for_task', 'insurance_crm_search_customers_for_task');
+
+/**
+ * AJAX handler for getting customer policies for task form
+ */
+function insurance_crm_get_customer_policies_for_tasks() {
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'get_policies_nonce')) {
+        wp_send_json_error('Security check failed');
+    }
+    
+    // Check user permissions
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error('Insufficient permissions');
+    }
+    
+    global $wpdb;
+    $policies_table = $wpdb->prefix . 'insurance_crm_policies';
+    
+    $customer_id = intval($_POST['customer_id']);
+    
+    // Check if customer ID is provided
+    if (empty($customer_id)) {
+        wp_send_json_error('Customer ID is required');
+    }
+    
+    // Get active policies for the customer
+    $policies = $wpdb->get_results($wpdb->prepare(
+        "SELECT id, policy_number, policy_type, insurance_company, status, start_date, end_date 
+         FROM {$policies_table} 
+         WHERE customer_id = %d AND status != 'iptal' 
+         ORDER BY created_at DESC",
+        $customer_id
+    ));
+    
+    if ($policies) {
+        wp_send_json_success($policies);
+    } else {
+        wp_send_json_success(array()); // Empty array but still success
+    }
+}
+
+add_action('wp_ajax_get_customer_policies_for_tasks', 'insurance_crm_get_customer_policies_for_tasks');
+
+/**
  * AJAX handler for hierarchy updates
  */
 function insurance_crm_ajax_update_hierarchy() {
@@ -2235,6 +2575,23 @@ function has_full_admin_access($user_id) {
  * AJAX Handlers for Personnel Management
  */
 add_action('wp_ajax_toggle_representative_status', 'handle_toggle_representative_status');
+
+// Policy prompt dismiss handler
+add_action('wp_ajax_dismiss_policy_prompt', 'handle_dismiss_policy_prompt');
+
+function handle_dismiss_policy_prompt() {
+    // Check nonce for security
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'dismiss_policy_prompt')) {
+        wp_die('Security check failed');
+    }
+    
+    // Clear session variables
+    unset($_SESSION['show_policy_prompt']);
+    unset($_SESSION['new_customer_id']);
+    unset($_SESSION['new_customer_name']);
+    
+    wp_send_json_success('Policy prompt dismissed');
+}
 
 function handle_toggle_representative_status() {
     check_ajax_referer('insurance_crm_ajax', '_wpnonce');

@@ -343,9 +343,9 @@ if (isset($_POST['save_customer']) && isset($_POST['customer_nonce']) && wp_veri
                     create_offer_reminder_task($customer_id, $customer_data);
                 }
                 
-                // Başarılı işlemden sonra yönlendirme
+                // Başarılı işlemden sonra yönlendirme - view sayfasına git
                 $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
-                echo '<script>window.location.href = "?view=customers&updated=true";</script>';
+                echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
                 exit;
             } else {
                 $message = 'Müşteri güncellenirken bir hata oluştu: ' . $wpdb->last_error;
@@ -387,7 +387,10 @@ if (isset($_POST['save_customer']) && isset($_POST['customer_nonce']) && wp_veri
             
             // Başarılı işlemden sonra yönlendirme
             $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
-            echo '<script>window.location.href = "?view=customers&added=true";</script>';
+            $_SESSION['show_policy_prompt'] = true; // Poliçe ekleme sorgusu için flag
+            $_SESSION['new_customer_id'] = $new_customer_id; // Yeni müşteri ID'si
+            $_SESSION['new_customer_name'] = $customer_data['first_name'] . ' ' . $customer_data['last_name']; // Müşteri adı soyadı
+            echo '<script>window.location.href = "?view=customers&action=view&id=' . $new_customer_id . '";</script>';
             exit;
         } else {
             $message = 'Müşteri eklenirken bir hata oluştu: ' . $wpdb->last_error;
@@ -765,71 +768,29 @@ function handle_customer_file_uploads($customer_id) {
     }
 }
 
-/**
- * Müşteri dosyasını siler
- */
-function delete_customer_file($file_id, $customer_id) {
-    global $wpdb;
-    $files_table = $wpdb->prefix . 'insurance_crm_customer_files';
-    
-    // Dosya bilgilerini al
-    $file = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $files_table WHERE id = %d AND customer_id = %d",
-        $file_id, $customer_id
-    ));
-    
-    if (!$file) {
-        return false;
-    }
-    
-    // Dosyayı fiziksel olarak sil
-    $upload_dir = wp_upload_dir();
-    $file_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $file->file_path);
-    if (file_exists($file_path)) {
-        unlink($file_path);
-    }
-    
-    // Veritabanından dosya kaydını sil
-    $wpdb->delete(
-        $files_table,
-        array('id' => $file_id)
-    );
-    
-    return true;
-}
-
-// Dosya türüne göre ikon belirleme
-function get_file_icon($file_type) {
-    switch ($file_type) {
-        case 'pdf':
-            return 'fa-file-pdf';
-        case 'docx':
-        case 'doc':
-            return 'fa-file-word';
-        case 'jpg':
-        case 'jpeg':
-        case 'png':
-            return 'fa-file-image';
-        case 'xls':
-        case 'xlsx':
-            return 'fa-file-excel';
-        case 'zip':
-            return 'fa-file-archive';
-        case 'txt':
-            return 'fa-file-alt';
-        default:
-            return 'fa-file';
-    }
-}
-
-// Dosya boyutu formatını düzenleme
-function format_file_size($size) {
-    if ($size < 1024) {
-        return $size . ' B';
-    } elseif ($size < 1048576) {
-        return round($size / 1024, 2) . ' KB';
-    } else {
-        return round($size / 1048576, 2) . ' MB';
+// Helper functions
+if (!function_exists('get_file_icon')) {
+    function get_file_icon($file_type) {
+        switch ($file_type) {
+            case 'pdf':
+                return 'fa-file-pdf';
+            case 'doc':
+            case 'docx':
+                return 'fa-file-word';
+            case 'jpg':
+            case 'jpeg':
+            case 'png':
+                return 'fa-file-image';
+            case 'xls':
+            case 'xlsx':
+                return 'fa-file-excel';
+            case 'txt':
+                return 'fa-file-alt';
+            case 'zip':
+                return 'fa-file-archive';
+            default:
+                return 'fa-file';
+        }
     }
 }
 
@@ -850,18 +811,37 @@ function get_allowed_file_types_text() {
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <div class="ab-customer-form-container">
-    <!-- Geri dön butonu -->
-    <div class="ab-form-header">
+    <!-- Modern Corporate Form Header -->
+    <div class="ab-form-header corporate-header">
+        <div class="header-background">
+            <div class="header-gradient"></div>
+        </div>
         <div class="ab-header-left">
-            <h2><i class="fas fa-user-edit"></i> <?php echo $editing ? 'Müşteri Düzenle' : 'Yeni Müşteri Ekle'; ?></h2>
+            <div class="header-title-container">
+                <div class="header-icon">
+                    <i class="fas <?php echo $editing ? 'fa-user-edit' : 'fa-user-plus'; ?>"></i>
+                </div>
+                <div class="header-content">
+                    <h1 class="header-title"><?php echo $editing ? 'Müşteri Bilgilerini Düzenle' : 'Yeni Müşteri Kayıt'; ?></h1>
+                    <div class="header-subtitle">
+                        <?php echo $editing ? 'Mevcut müşteri bilgilerini güncelleyin' : 'Sistemde yeni bir müşteri hesabı oluşturun'; ?>
+                    </div>
+                </div>
+            </div>
             <div class="ab-breadcrumbs">
-                <a href="?view=customers">Müşteriler</a> <i class="fas fa-chevron-right"></i> 
-                <span><?php echo $editing ? 'Düzenle: ' . esc_html($customer->first_name . ' ' . $customer->last_name) : 'Yeni Müşteri'; ?></span>
+                <a href="?view=customers" class="breadcrumb-link">
+                    <i class="fas fa-users"></i> Müşteriler
+                </a> 
+                <i class="fas fa-chevron-right breadcrumb-separator"></i> 
+                <span class="breadcrumb-current"><?php echo $editing ? 'Düzenle: ' . esc_html($customer->first_name . ' ' . $customer->last_name) : 'Yeni Müşteri'; ?></span>
             </div>
         </div>
-        <a href="?view=customers" class="ab-btn ab-btn-secondary">
-            <i class="fas fa-arrow-left"></i> Listeye Dön
-        </a>
+        <div class="header-actions">
+            <a href="?view=customers" class="ab-btn ab-btn-secondary modern-btn">
+                <i class="fas fa-arrow-left"></i> 
+                <span>Listeye Dön</span>
+            </a>
+        </div>
     </div>
 
     <?php if (isset($message)): ?>
@@ -1637,6 +1617,164 @@ function get_allowed_file_types_text() {
     margin-bottom: 20px;
     padding-bottom: 15px;
     border-bottom: 1px solid #e0e0e0;
+}
+
+/* Modern Corporate Header Styles */
+.corporate-header {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
+    color: white;
+    padding: 32px 40px;
+    border-radius: 16px;
+    margin-bottom: 32px;
+    border-bottom: none;
+    box-shadow: 0 12px 40px rgba(30, 64, 175, 0.15);
+    position: relative;
+    overflow: hidden;
+}
+
+.corporate-header .header-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.1;
+}
+
+.corporate-header .header-gradient {
+    background: radial-gradient(ellipse at top right, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
+    width: 100%;
+    height: 100%;
+}
+
+.corporate-header .header-title-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.corporate-header .header-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.corporate-header .header-title {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.5px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.corporate-header .header-subtitle {
+    font-size: 16px;
+    opacity: 0.9;
+    margin-top: 6px;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+/* Modern Header Styles */
+.modern-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 25px 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    border-bottom: none;
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.15);
+}
+
+.header-title-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 10px;
+}
+
+.header-icon {
+    background: rgba(255, 255, 255, 0.2);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    backdrop-filter: blur(10px);
+}
+
+.header-content {
+    flex: 1;
+}
+
+.header-title {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-subtitle {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-top: 5px;
+    font-weight: 400;
+}
+
+.modern-header .ab-breadcrumbs {
+    margin-top: 15px;
+}
+
+.breadcrumb-link {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: 6px;
+}
+
+.breadcrumb-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.breadcrumb-separator {
+    margin: 0 10px;
+    opacity: 0.7;
+}
+
+.breadcrumb-current {
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+.header-actions .modern-btn {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.header-actions .modern-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
 }
 
 .ab-header-left {
@@ -3066,5 +3204,79 @@ jQuery(document).ready(function($) {
     
     // Sayfa yüklendiğinde başlangıç ayarlarını çağır
     initializeForm();
+    
+    // İsim formatlama fonksiyonu
+    function formatName(value) {
+        if (!value) return '';
+        
+        // Boşluklara göre ayır ve her kelimeyi formatla
+        return value.toLowerCase().split(' ').map(function(word) {
+            if (word.length === 0) return '';
+            // İlk harf büyük, geri kalanı küçük
+            return word.charAt(0).toUpperCase() + word.slice(1);
+        }).join(' ');
+    }
+    
+    // Soyisim formatlama fonksiyonu (tamamen büyük harf)
+    function formatLastName(value) {
+        if (!value) return '';
+        return value.toUpperCase();
+    }
+    
+    // Şirket adı formatlama fonksiyonu
+    function formatCompanyName(value) {
+        if (!value) return '';
+        
+        // Her kelimenin ilk harfi büyük olsun
+        return value.toLowerCase().split(' ').map(function(word) {
+            if (word.length === 0) return '';
+            return word.charAt(0).toUpperCase() + word.slice(1);
+        }).join(' ');
+    }
+    
+    // İsim alanlarına formatlanma event'leri ekle
+    $('#first_name').on('blur', function() {
+        $(this).val(formatName($(this).val()));
+    });
+    
+    $('#last_name').on('blur', function() {
+        $(this).val(formatLastName($(this).val()));
+    });
+    
+    $('#company_name').on('blur', function() {
+        $(this).val(formatCompanyName($(this).val()));
+    });
+    
+    // Eş adı için de formatlanma
+    $('#spouse_name').on('blur', function() {
+        const spouseName = $(this).val();
+        if (spouseName) {
+            // Eş adı da "Ad SOYAD" formatında olsun
+            const nameParts = spouseName.split(' ');
+            if (nameParts.length >= 2) {
+                const firstName = nameParts.slice(0, -1).map(name => formatName(name)).join(' ');
+                const lastName = formatLastName(nameParts[nameParts.length - 1]);
+                $(this).val(firstName + ' ' + lastName);
+            } else {
+                $(this).val(formatName(spouseName));
+            }
+        }
+    });
+    
+    // Çocuk isimleri için formatlanma (dinamik olarak eklenen alanlar için)
+    $(document).on('blur', '.child-name-input', function() {
+        const childName = $(this).val();
+        if (childName) {
+            // Çocuk adı da "Ad SOYAD" formatında olsun
+            const nameParts = childName.split(' ');
+            if (nameParts.length >= 2) {
+                const firstName = nameParts.slice(0, -1).map(name => formatName(name)).join(' ');
+                const lastName = formatLastName(nameParts[nameParts.length - 1]);
+                $(this).val(firstName + ' ' + lastName);
+            } else {
+                $(this).val(formatName(childName));
+            }
+        }
+    });
 });
 </script>

@@ -126,8 +126,8 @@ function get_representative_avatar($rep) {
 
 
 <div class="main-content organization-hierarchy-page">
-    <!-- Enhanced Page Header -->
-    <div class="page-header-modern">
+    <!-- Modern Corporate Page Header -->
+    <div class="page-header-corporate">
         <div class="header-background">
             <div class="header-pattern"></div>
             <div class="header-gradient"></div>
@@ -135,69 +135,81 @@ function get_representative_avatar($rep) {
         <div class="header-content">
             <div class="header-main">
                 <div class="page-icon">
-                    <svg class="organization-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M8 9l3 3-3 3m5 0h3"/>
-                    </svg>
+                    <i class="fas fa-sitemap"></i>
                 </div>
                 <div class="page-info">
-                    <h1 class="page-title">Organizasyon Hiyerarşisi</h1>
-                    <p class="page-subtitle">Eksiksiz organizasyon şeması ve yönetim yapısı</p>
+                    <h1 class="page-title">Organizasyon Şeması</h1>
+                    <p class="page-subtitle">Firma hiyerarşi yapısı ve ekip organizasyonu</p>
                 </div>
             </div>
             
             <!-- Organization Quick Stats -->
             <div class="org-quick-stats">
                 <div class="quick-stat">
-                    <div class="stat-number"><?php echo $organization_stats['total_teams']; ?></div>
-                    <div class="stat-label">Ekip</div>
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-number"><?php echo $organization_stats['total_teams']; ?></div>
+                        <div class="stat-label">Ekip</div>
+                    </div>
                 </div>
                 <div class="quick-stat">
-                    <div class="stat-number"><?php echo $organization_stats['total_representatives']; ?></div>
-                    <div class="stat-label">Temsilci</div>
+                    <div class="stat-icon"><i class="fas fa-user-tie"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-number"><?php echo $organization_stats['total_representatives']; ?></div>
+                        <div class="stat-label">Temsilci</div>
+                    </div>
                 </div>
                 <div class="quick-stat">
-                    <div class="stat-number"><?php echo $organization_stats['total_leaders']; ?></div>
-                    <div class="stat-label">Lider</div>
+                    <div class="stat-icon"><i class="fas fa-crown"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-number"><?php echo $organization_stats['total_leaders']; ?></div>
+                        <div class="stat-label">Lider</div>
+                    </div>
                 </div>
                 <div class="quick-stat">
-                    <div class="stat-number">₺<?php echo number_format($organization_stats['total_premium'] / 1000000, 1); ?>M</div>
-                    <div class="stat-label">Toplam Üretim</div>
+                    <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-number">₺<?php echo number_format($organization_stats['total_premium'] / 1000000, 1); ?>M</div>
+                        <div class="stat-label">Toplam Üretim</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Comprehensive Hierarchy Visualization -->
-    <div class="hierarchy-visualization-container">
-        <div class="hierarchy-controls">
-            <div class="control-group">
+    <!-- Enhanced Hierarchy Controls -->
+    <div class="hierarchy-controls-section">
+        <div class="controls-container">
+            <div class="view-modes">
                 <button class="view-mode-btn active" data-mode="detailed">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                        <line x1="9" y1="9" x2="15" y2="9"/>
-                        <line x1="9" y1="15" x2="15" y2="15"/>
-                    </svg>
-                    Detaylı Görünüm
+                    <i class="fas fa-th-large"></i>
+                    <span>Detaylı</span>
                 </button>
                 <button class="view-mode-btn" data-mode="compact">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <circle cx="18" cy="5" r="3"/>
-                        <circle cx="6" cy="12" r="3"/>
-                        <circle cx="18" cy="19" r="3"/>
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                    </svg>
-                    Kompakt Görünüm
+                    <i class="fas fa-list"></i>
+                    <span>Kompakt</span>
+                </button>
+                <button class="view-mode-btn" data-mode="tree">
+                    <i class="fas fa-sitemap"></i>
+                    <span>Ağaç</span>
                 </button>
             </div>
-            <div class="action-group">
-                <a href="<?php echo admin_url('admin.php?page=insurance-crm-representatives&tab=hierarchy'); ?>" 
-                   class="control-btn primary">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="m18.5 2.5 A2.121 2.121 0 0 1 21 5.621v0A2.121 2.121 0 0 1 18.5 8.121L10 16.621 6 18l1.379-4L16.5 5.621z"/>
-                    </svg>
-                    Düzenle
+            <div class="action-controls">
+                <button class="control-btn" onclick="expandAll()">
+                    <i class="fas fa-expand-arrows-alt"></i>
+                    <span>Tümünü Genişlet</span>
+                </button>
+                <button class="control-btn" onclick="collapseAll()">
+                    <i class="fas fa-compress-arrows-alt"></i>
+                    <span>Tümünü Daralt</span>
+                </button>
+                <button class="control-btn primary" onclick="printHierarchy()">
+                    <i class="fas fa-print"></i>
+                    <span>Yazdır</span>
+                </button>
+            </div>
+        </div>
+    </div>
                 </a>
                 <button class="control-btn" id="refresh-org">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -1619,6 +1631,239 @@ function get_representative_avatar($rep) {
         width: 100%;
     }
     
+/* Modern Corporate Organization Page Styles */
+.page-header-corporate {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%);
+    border-radius: 20px;
+    margin-bottom: 30px;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 15px 50px rgba(30, 64, 175, 0.2);
+}
+
+.page-header-corporate .header-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.1;
+}
+
+.page-header-corporate .header-gradient {
+    background: radial-gradient(ellipse at top right, rgba(255, 255, 255, 0.15) 0%, transparent 60%);
+    width: 100%;
+    height: 100%;
+}
+
+.page-header-corporate .header-content {
+    padding: 40px;
+    position: relative;
+    z-index: 1;
+}
+
+.page-header-corporate .header-main {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.page-header-corporate .page-icon {
+    width: 70px;
+    height: 70px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.page-header-corporate .page-title {
+    font-size: 32px;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.5px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.page-header-corporate .page-subtitle {
+    font-size: 18px;
+    opacity: 0.9;
+    margin: 8px 0 0 0;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+.org-quick-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+}
+
+.quick-stat {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.quick-stat .stat-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.quick-stat .stat-content {
+    text-align: left;
+}
+
+.quick-stat .stat-number {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: white;
+}
+
+.quick-stat .stat-label {
+    font-size: 14px;
+    opacity: 0.9;
+    font-weight: 500;
+}
+
+.hierarchy-controls-section {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    margin-bottom: 24px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.controls-container {
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+}
+
+.view-modes {
+    display: flex;
+    gap: 8px;
+    background: #f8fafc;
+    padding: 4px;
+    border-radius: 12px;
+}
+
+.view-mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.view-mode-btn.active,
+.view-mode-btn:hover {
+    background: #3b82f6;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.action-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.control-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.control-btn:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.control-btn.primary {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+}
+
+.control-btn.primary:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .page-header-corporate .header-content {
+        padding: 24px;
+    }
+    
+    .page-header-corporate .header-main {
+        flex-direction: column;
+        text-align: center;
+        margin-bottom: 24px;
+    }
+    
+    .org-quick-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .controls-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .view-modes {
+        justify-content: center;
+    }
+    
+    .action-controls {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+}
+
     .view-mode-btn, .control-btn {
         width: 100%;
         justify-content: center;
@@ -1627,6 +1872,25 @@ function get_representative_avatar($rep) {
 </style>
 
 <script>
+// Enhanced organization controls
+function expandAll() {
+    const items = document.querySelectorAll('.hierarchy-item');
+    items.forEach(item => {
+        item.classList.add('expanded');
+    });
+}
+
+function collapseAll() {
+    const items = document.querySelectorAll('.hierarchy-item');
+    items.forEach(item => {
+        item.classList.remove('expanded');
+    });
+}
+
+function printHierarchy() {
+    window.print();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // View mode switching
     const viewModeButtons = document.querySelectorAll('.view-mode-btn');

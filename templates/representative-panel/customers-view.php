@@ -177,7 +177,48 @@ if (isset($_POST['action']) && $_POST['action'] === 'create_reminder_task' && is
     }
     
     // Sayfayı yenile
-    echo '<script>window.location.href = "?view=customers-view&id=' . $customer_id . '";</script>';
+    echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
+    exit;
+}
+
+// Teklif durumu güncelleme işlemi (txt dosyasından)
+if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && isset($_POST['customer_id'])) {
+    if (!wp_verify_nonce($_POST['quote_nonce'], 'update_customer_quote')) {
+        wp_die('Security check failed');
+    }
+    
+    $customer_id = intval($_POST['customer_id']);
+    
+    // Debug logging
+    error_log("Quote update - POST customer_id: " . $_POST['customer_id']);
+    error_log("Quote update - Processed customer_id: " . $customer_id);
+    $quote_data = array(
+        'has_offer' => 1,
+        'offer_insurance_type' => sanitize_text_field($_POST['offer_insurance_type']),
+        'offer_amount' => floatval($_POST['offer_amount']),
+        'offer_expiry_date' => sanitize_text_field($_POST['offer_expiry_date']),
+        'offer_reminder' => intval($_POST['offer_reminder']),
+        'offer_notes' => sanitize_textarea_field($_POST['offer_notes'])
+    );
+    
+    $result = $wpdb->update($customers_table, $quote_data, array('id' => $customer_id));
+    
+    if ($result !== false) {
+        // Create reminder task if requested
+        if ($quote_data['offer_reminder'] == 1 && !empty($quote_data['offer_expiry_date'])) {
+            if (!function_exists('create_offer_reminder_task')) {
+                require_once(dirname(__FILE__) . '/customers-form.php');
+            }
+            create_offer_reminder_task($customer_id, $quote_data);
+        }
+        
+        $_SESSION['crm_notice'] = '<div class="ab-notice ab-success">Teklif bilgileri başarıyla güncellendi.</div>';
+    } else {
+        $_SESSION['crm_notice'] = '<div class="ab-notice ab-error">Teklif bilgileri güncellenirken hata oluştu.</div>';
+    }
+    
+    // Sayfayı yenile
+    echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
     exit;
 }
 
@@ -356,6 +397,48 @@ if (isset($_POST['ajax_delete_file']) && wp_verify_nonce($_POST['file_delete_non
     exit;
 }
 
+// Normal Teklif Güncelleme İşlemi (AJAX yerine)
+if (isset($_POST['action']) && $_POST['action'] === 'update_offer' && isset($_POST['offer_nonce']) && wp_verify_nonce($_POST['offer_nonce'], 'update_customer_offer')) {
+    $customer_id = intval($_POST['customer_id']);
+    
+    // Verileri sanitize et
+    $offer_data = array(
+        'has_offer' => 1,
+        'offer_insurance_type' => sanitize_text_field($_POST['offer_insurance_type']),
+        'offer_amount' => floatval($_POST['offer_amount']),
+        'offer_expiry_date' => sanitize_text_field($_POST['offer_expiry_date']),
+        'offer_reminder' => intval($_POST['offer_reminder']),
+        'offer_notes' => sanitize_textarea_field($_POST['offer_notes'])
+    );
+    
+    // Müşteri verisini güncelle
+    $update_result = $wpdb->update(
+        $customers_table,
+        $offer_data,
+        array('id' => $customer_id),
+        array('%d', '%s', '%f', '%s', '%d', '%s'),
+        array('%d')
+    );
+    
+    if ($update_result !== false) {
+        $message = 'Teklif bilgileri başarıyla kaydedildi.';
+        $message_type = 'success';
+        
+        // Hatırlatma görevi oluştur
+        if (!empty($offer_data['offer_reminder']) && !empty($offer_data['offer_expiry_date'])) {
+            create_offer_reminder_task($customer_id, $offer_data);
+        }
+    } else {
+        $message = 'Teklif bilgileri kaydedilirken bir hata oluştu.';
+        $message_type = 'error';
+    }
+    
+    // Başarı mesajını session'a kaydet ve sayfayı yenile
+    $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
+    echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '&offer_updated=1";</script>';
+    exit;
+}
+
 // Not ekleme işlemi
 if (isset($_POST['add_note']) && isset($_POST['note_nonce']) && wp_verify_nonce($_POST['note_nonce'], 'add_customer_note')) {
     $note_data = array(
@@ -384,6 +467,56 @@ if (isset($_POST['add_note']) && isset($_POST['note_nonce']) && wp_verify_nonce(
     echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '&note_added=1";</script>';
 }
 
+// Teklif sonlandırma işlemi
+if (isset($_POST['action']) && $_POST['action'] === 'terminate_offer' && isset($_POST['terminate_nonce']) && wp_verify_nonce($_POST['terminate_nonce'], 'terminate_offer')) {
+    $customer_id = intval($_POST['customer_id']);
+    $terminate_reason = sanitize_textarea_field($_POST['terminate_reason']);
+    
+    // Teklifi temizle ve müşteriyi pasif yap
+    $update_data = array(
+        'has_offer' => 0,
+        'offer_insurance_type' => '',
+        'offer_amount' => 0,
+        'offer_expiry_date' => null,
+        'offer_reminder' => 0,
+        'offer_notes' => '',
+        'status' => 'pasif'
+    );
+    
+    $update_result = $wpdb->update(
+        $customers_table,
+        $update_data,
+        array('id' => $customer_id),
+        array('%d', '%s', '%f', '%s', '%d', '%s', '%s'),
+        array('%d')
+    );
+    
+    if ($update_result !== false) {
+        // Sonlandırma notunu ekle
+        $notes_table = $wpdb->prefix . 'insurance_crm_customer_notes';
+        $note_data = array(
+            'customer_id' => $customer_id,
+            'note_content' => 'Teklif sonlandırıldı. Sebep: ' . $terminate_reason,
+            'note_type' => 'negative',
+            'rejection_reason' => 'other',
+            'created_by' => get_current_user_id(),
+            'created_at' => current_time('mysql')
+        );
+        $wpdb->insert($notes_table, $note_data);
+        
+        $message = 'Teklif başarıyla sonlandırıldı ve müşteri pasif duruma alındı.';
+        $message_type = 'success';
+    } else {
+        $message = 'Teklif sonlandırılırken bir hata oluştu.';
+        $message_type = 'error';
+    }
+    
+    // Sayfayı yenile
+    $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
+    echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '&offer_terminated=1";</script>';
+    exit;
+}
+
 // Normal dosya silme işlemi
 if (isset($_POST['delete_file']) && isset($_POST['file_nonce']) && wp_verify_nonce($_POST['file_nonce'], 'delete_file_view')) {
     $file_id = intval($_POST['file_id']);
@@ -402,7 +535,7 @@ if (isset($_POST['delete_file']) && isset($_POST['file_nonce']) && wp_verify_non
     exit;
 }
 
-// Görüşme notlarını al
+// Görüşme notlarını al (tarihe göre sıralı)
 $notes_table = $wpdb->prefix . 'insurance_crm_customer_notes';
 $customer_notes = $wpdb->get_results($wpdb->prepare("
     SELECT n.*, 
@@ -646,14 +779,9 @@ function format_file_size($size) {
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <div class="ab-customer-details">
-
-    <!-- Geri dön butonu -->
-    <a href="?view=customers" class="ab-back-button">
-        <i class="fas fa-arrow-left"></i> Müşterilere Dön
-    </a>
     
     <!-- Müşteri Başlık Bilgisi -->
-    <div class="ab-customer-header">
+    <div class="ab-customer-header" style="padding: 20px 40px;">
         <div class="ab-customer-title">
             <h1><i class="fas fa-user"></i> <?php echo esc_html($customer->first_name . ' ' . $customer->last_name); ?></h1>
             <div class="ab-customer-meta">
@@ -707,7 +835,7 @@ function format_file_size($size) {
     <div id="ajax-response-container"></div>
     
     <!-- Müşteri Bilgileri -->
-    <div class="ab-panels">
+    <div class="ab-panels" style="padding: 0 40px;">
         <div class="ab-panel ab-panel-personal" style="--panel-color: <?php echo esc_attr($personal_color); ?>">
             <div class="ab-panel-header">
                 <h3><i class="fas fa-user-circle"></i> Kişisel Bilgiler</h3>
@@ -1057,46 +1185,58 @@ function format_file_size($size) {
                         <div class="ab-info-label">Teklif Durumu</div>
                         <div class="ab-info-value">
                             <?php 
-                            if (isset($customer->has_offer) && $customer->has_offer == 1) {
+                            $has_offer = isset($customer->has_offer) && $customer->has_offer == 1;
+                            if ($has_offer) {
                                 echo '<span class="ab-positive">Evet</span>';
+                                echo ' <button type="button" onclick="toggleOfferStatus(0)" class="btn-small btn-outline" title="Hayır olarak değiştir">
+                                        <i class="fas fa-edit"></i>
+                                      </button>';
                             } else {
                                 echo '<span class="ab-negative">Hayır</span>';
+                                echo ' <button type="button" onclick="toggleOfferStatus(1)" class="btn-small btn-primary" title="Evet olarak değiştir">
+                                        <i class="fas fa-plus"></i> Teklif Ver
+                                      </button>';
                             }
                             ?>
                         </div>
                     </div>
                     
-                    <?php if (isset($customer->has_offer) && $customer->has_offer == 1): ?>
-                    <div class="ab-info-item">
-                        <div class="ab-info-label">Sigorta Tipi</div>
-                        <div class="ab-info-value">
-                            <?php echo !empty($customer->offer_insurance_type) ? esc_html($customer->offer_insurance_type) : '<span class="no-value">Belirtilmemiş</span>'; ?>
+                    <?php if ($has_offer): ?>
+                    <div class="ab-info-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="ab-info-item">
+                            <div class="ab-info-label">Sigorta Tipi</div>
+                            <div class="ab-info-value">
+                                <?php echo !empty($customer->offer_insurance_type) ? esc_html($customer->offer_insurance_type) : '<span class="no-value">Belirtilmemiş</span>'; ?>
+                            </div>
+                        </div>
+                        
+                        <div class="ab-info-item">
+                            <div class="ab-info-label">Teklif Tutarı</div>
+                            <div class="ab-info-value ab-amount">
+                                <?php 
+                                if (!empty($customer->offer_amount)) {
+                                    echo number_format($customer->offer_amount, 2, ',', '.') . ' ₺';
+                                } else {
+                                    echo '<span class="no-value">Belirtilmemiş</span>';
+                                }
+                                ?>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="ab-info-item">
-                        <div class="ab-info-label">Teklif Tutarı</div>
-                        <div class="ab-info-value ab-amount">
-                            <?php 
-                            if (!empty($customer->offer_amount)) {
-                                echo number_format($customer->offer_amount, 2, ',', '.') . ' ₺';
-                            } else {
-                                echo '<span class="no-value">Belirtilmemiş</span>';
-                            }
-                            ?>
+                        <div class="ab-info-item">
+                            <div class="ab-info-label">Teklif Vadesi</div>
+                            <div class="ab-info-value">
+                                <?php echo !empty($customer->offer_expiry_date) ? date('d.m.Y', strtotime($customer->offer_expiry_date)) : '<span class="no-value">Belirtilmemiş</span>'; ?>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="ab-info-item">
-                        <div class="ab-info-label">Teklif Vadesi</div>
-                        <div class="ab-info-value">
-                            <?php echo !empty($customer->offer_expiry_date) ? date('d.m.Y', strtotime($customer->offer_expiry_date)) : '<span class="no-value">Belirtilmemiş</span>'; ?>
-                        </div>
-                    </div>
+                    <div class="ab-info-grid" style="grid-template-columns: 1fr 1fr;">
                     
-                    <div class="ab-info-item">
-                        <div class="ab-info-label">Teklif Dosyası</div>
-                        <div class="ab-info-value ab-offer-file">
+                        <div class="ab-info-item">
+                            <div class="ab-info-label">Teklif Dosyası</div>
+                            <div class="ab-info-value ab-offer-file">
                             <?php 
                             // Teklif dosyasını bulmak için dosya arşivini kontrol et
                             $offer_file = null;
@@ -1115,37 +1255,64 @@ function format_file_size($size) {
                                     <i class="fas <?php echo get_file_icon($offer_file->file_type); ?>"></i> 
                                     <?php echo esc_html($offer_file->file_name); ?>
                                 </a>
-                                <div class="ab-offer-actions">
-                                    <a href="?view=policies&action=create_from_offer&customer_id=<?php echo $customer_id; ?>&offer_amount=<?php echo !empty($customer->offer_amount) ? $customer->offer_amount : '0'; ?>&offer_type=<?php echo !empty($customer->offer_insurance_type) ? urlencode($customer->offer_insurance_type) : ''; ?>" class="ab-btn ab-btn-sm ab-btn-primary">
-                                        <i class="fas fa-exchange-alt"></i> POLİÇELEŞTİR
-                                    </a>
-                                    <?php if (!empty($customer->offer_expiry_date)): ?>
-                                    <button type="button" class="ab-btn ab-btn-sm ab-btn-info" id="btn-create-reminder" onclick="createReminderTask(<?php echo $customer_id; ?>)">
-                                        <i class="fas fa-bell"></i> HATIRLATMA OLUŞTUR
-                                    </button>
-                                    <?php endif; ?>
-                                    <a href="#customer-notes-section" class="ab-btn ab-btn-sm ab-btn-warning" id="btn-finalize-offer">
-                                        <i class="fas fa-check-circle"></i> SONLANDIR
-                                    </a>
-                                </div>
                             <?php else: ?>
                                 <span class="no-value">Dosya yüklenmemiş</span>
                                 <a href="#" class="ab-btn ab-btn-sm open-file-upload-modal">
                                     <i class="fas fa-upload"></i> Teklif Dosyası Yükle
                                 </a>
                             <?php endif; ?>
+                            </div>
+                        </div>
+                        
+                        <div class="ab-info-item">
+                            <div class="ab-info-label">Teklif Notları</div>
+                            <div class="ab-info-value">
+                                <?php echo !empty($customer->offer_notes) ? nl2br(esc_html($customer->offer_notes)) : '<span class="no-value">Not eklenmemiş</span>'; ?>
+                            </div>
                         </div>
                     </div>
+                    
+                    <!-- Teklif Aksiyon Butonları -->
+                    <div class="ab-info-actions" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: flex; gap: 15px; justify-content: center;">
+                        <a href="?view=policies&action=create_from_offer&customer_id=<?php echo $customer_id; ?>&offer_amount=<?php echo !empty($customer->offer_amount) ? $customer->offer_amount : '0'; ?>&offer_type=<?php echo !empty($customer->offer_insurance_type) ? urlencode($customer->offer_insurance_type) : ''; ?>" class="ab-btn ab-btn-success">
+                            <i class="fas fa-file-contract"></i> Poliçeleştir
+                        </a>
+                        <button type="button" class="ab-btn ab-btn-danger" onclick="showTerminateModal(<?php echo $customer->id; ?>)">
+                            <i class="fas fa-times-circle"></i> Sonlandır
+                        </button>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Sonlandırma Modal -->
+                <div id="terminate-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+                    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3><i class="fas fa-times-circle"></i> Teklif Sonlandırma</h3>
+                            <button type="button" onclick="closeTerminateModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+                        </div>
+                        <form id="terminate-form" method="post">
+                            <input type="hidden" name="customer_id" value="<?php echo $customer->id; ?>">
+                            <input type="hidden" name="action" value="terminate_offer">
+                            <?php wp_nonce_field('terminate_offer', 'terminate_nonce'); ?>
                             
-                    <?php if (!empty($customer->offer_notes)): ?>
-                    <div class="ab-info-item ab-full-width">
-                        <div class="ab-info-label">Teklif Notları</div>
-                        <div class="ab-info-value">
-                            <?php echo nl2br(esc_html($customer->offer_notes)); ?>
-                        </div>
+                            <div style="margin-bottom: 20px;">
+                                <label for="terminate_reason" style="display: block; margin-bottom: 8px; font-weight: bold;">Sonlandırma Sebebi *</label>
+                                <textarea name="terminate_reason" id="terminate_reason" rows="4" required
+                                          placeholder="Teklifin neden sonlandırıldığını açıklayınız..." 
+                                          style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;"></textarea>
+                            </div>
+                            
+                            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                                <button type="submit" class="ab-btn ab-btn-danger">
+                                    <i class="fas fa-times-circle"></i> Sonlandır ve Müşteriyi Pasif Yap
+                                </button>
+                                <button type="button" class="ab-btn ab-btn-secondary" onclick="closeTerminateModal()">
+                                    <i class="fas fa-times"></i> İptal
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                    <?php endif; ?>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -1205,40 +1372,39 @@ function format_file_size($size) {
                 </div>
 
                 <!-- Mevcut Notlar -->
-                <div class="ab-notes-list">
+                <div class="ab-notes-list" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 15px;">
                     <?php if (empty($customer_notes)): ?>
-                    <div class="ab-empty-state">
-                       <center> <p><i class="fas fa-comments"></i><br>Henüz görüşme notu eklenmemiş.</p></center>
-
+                    <div class="ab-empty-state" style="grid-column: 1 / -1; text-align: center;">
+                        <p><i class="fas fa-comments"></i><br>Henüz görüşme notu eklenmemiş.</p>
                     </div>
                     <?php else: ?>
                         <?php foreach ($customer_notes as $note): ?>
-                        <div class="ab-note-item ab-note-<?php echo esc_attr($note->note_type); ?>">
-                            <div class="ab-note-header">
-                                <div class="ab-note-meta">
-                                    <span class="ab-note-user">
+                        <div class="ab-sticky-note sticky-note-<?php echo esc_attr($note->note_type); ?>">
+                            <div class="sticky-note-header">
+                                <div class="sticky-note-meta">
+                                    <span class="sticky-note-user">
                                         <i class="fas fa-user"></i> <?php echo esc_html($note->user_name); ?>
                                     </span>
-                                    <span class="ab-note-date">
+                                    <span class="sticky-note-date">
                                         <i class="fas fa-clock"></i> <?php echo date('d.m.Y H:i', strtotime($note->created_at)); ?>
                                     </span>
-                                    <span class="ab-note-type ab-badge ab-badge-<?php echo esc_attr($note->note_type); ?>">
-                                        <?php 
-                                        switch ($note->note_type) {
-                                            case 'positive': echo 'Olumlu'; break;
-                                            case 'neutral': echo 'Belirsiz'; break;
-                                            case 'negative': echo 'Olumsuz'; break;
-                                            default: echo ucfirst($note->note_type); break;
-                                        }
-                                        ?>
-                                    </span>
+                                </div>
+                                <div class="sticky-note-type-badge sticky-note-type-<?php echo esc_attr($note->note_type); ?>">
+                                    <?php 
+                                    switch ($note->note_type) {
+                                        case 'positive': echo 'Olumlu'; break;
+                                        case 'neutral': echo 'Belirsiz'; break;
+                                        case 'negative': echo 'Olumsuz'; break;
+                                        default: echo ucfirst($note->note_type); break;
+                                    }
+                                    ?>
                                 </div>
                             </div>
-                            <div class="ab-note-content">
+                            <div class="sticky-note-content">
                                 <?php echo nl2br(esc_html($note->note_content)); ?>
                             </div>
                             <?php if (!empty($note->rejection_reason)): ?>
-                            <div class="ab-note-reason">
+                            <div class="sticky-note-reason">
                                 <strong>Sebep:</strong> 
                                 <?php 
                                 switch ($note->rejection_reason) {
@@ -2000,33 +2166,212 @@ function format_file_size($size) {
     border: 1px solid #66bb6a;
 }
 
-/* Notlar Stilleri */
+/* Notlar Stilleri - Sticker/Baloncuk Tasarımı */
+/* Sticker Not Kağıdı Stilleri */
+.ab-sticky-note {
+    position: relative;
+    background: #ffd700;
+    padding: 15px 20px 20px 20px;
+    margin: 15px 10px;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: rotate(-1deg);
+    transition: all 0.3s ease;
+    max-width: 300px;
+    min-height: 120px;
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+}
+
+.ab-sticky-note:nth-child(even) {
+    transform: rotate(1deg);
+    margin-left: auto;
+    margin-right: 20px;
+    background: #ffb3ba;
+}
+
+.ab-sticky-note:nth-child(odd) {
+    transform: rotate(-1deg);
+    margin-left: 20px;
+    margin-right: auto;
+    background: #baffc9;
+}
+
+.ab-sticky-note:nth-child(3n) {
+    background: #bae1ff;
+    transform: rotate(0.5deg);
+}
+
+.ab-sticky-note:hover {
+    transform: rotate(0deg) scale(1.05);
+    z-index: 10;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.ab-sticky-note::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sticky-note-header {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed rgba(0, 0, 0, 0.3);
+}
+
+.sticky-note-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    font-size: 11px;
+    color: #555;
+    margin-bottom: 5px;
+}
+
+.sticky-note-user, .sticky-note-date {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.sticky-note-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.sticky-note-type-positive {
+    background: #28a745;
+    color: white;
+}
+
+.sticky-note-type-neutral {
+    background: #ffc107;
+    color: #333;
+}
+
+.sticky-note-type-negative {
+    background: #dc3545;
+    color: white;
+}
+
+.sticky-note-content {
+    font-size: 13px;
+    line-height: 1.4;
+    color: #333;
+    margin: 10px 0;
+    word-wrap: break-word;
+}
+
+.sticky-note-reason {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.2);
+    font-size: 11px;
+    color: #666;
+}
+
+/* Renk varyasyonları */
+.sticky-note-positive {
+    background: #d4edda !important;
+}
+
+.sticky-note-neutral {
+    background: #fff3cd !important;
+}
+
+.sticky-note-negative {
+    background: #f8d7da !important;
+}
+
 .ab-notes-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 15px;
     margin-top: 15px;
 }
 
-.ab-note {
-    border: 1px solid #eee;
-    border-radius: 4px;
-    padding: 15px;
+.ab-note-item {
     position: relative;
-    background-color: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    padding: 15px 20px;
+    border-radius: 18px;
+    margin-bottom: 15px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    max-width: 85%;
 }
 
+.ab-note-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* Sağa ve sola yerleştirme efekti */
+.ab-note-item:nth-child(even) {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border: 2px solid #2196f3;
+}
+
+.ab-note-item:nth-child(odd) {
+    align-self: flex-start;
+    background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
+    border: 2px solid #4caf50;
+}
+
+/* Tür bazlı renkler korunuyor */
 .ab-note-positive {
-    border-left: 4px solid #4caf50;
+    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%) !important;
+    border: 2px solid #4caf50 !important;
 }
 
 .ab-note-negative {
-    border-left: 4px solid #f44336;
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%) !important;
+    border: 2px solid #f44336 !important;
 }
 
 .ab-note-neutral {
-    border-left: 4px solid #ff9800;
+    background: linear-gradient(135deg, #fff8e1 0%, #fff3c4 100%) !important;
+    border: 2px solid #ff9800 !important;
+}
+
+/* Baloncuk okları */
+.ab-note-item:nth-child(even)::before {
+    content: "";
+    position: absolute;
+    right: -10px;
+    top: 20px;
+    width: 0;
+    height: 0;
+    border-left: 10px solid;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+    border-left-color: inherit;
+}
+
+.ab-note-item:nth-child(odd)::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 20px;
+    width: 0;
+    height: 0;
+    border-right: 10px solid;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+    border-right-color: inherit;
 }
 
 .ab-note-header {
@@ -2040,24 +2385,30 @@ function format_file_size($size) {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    font-size: 13px;
+    font-size: 12px;
     color: #666;
+    font-weight: 500;
 }
 
 .ab-note-meta i {
     margin-right: 3px;
+    color: #888;
 }
 
 .ab-note-content {
     margin-bottom: 10px;
-    line-height: 1.5;
+    line-height: 1.6;
+    font-size: 14px;
+    color: #333;
+    font-weight: 400;
 }
 
 .ab-note-reason {
     font-size: 12px;
     color: #666;
     padding-top: 8px;
-    border-top: 1px dashed #eee;
+    border-top: 1px dashed rgba(0,0,0,0.2);
+    font-style: italic;
 }
 
 /* Badge Stilleri */
@@ -3078,6 +3429,245 @@ tr.overdue td {
         justify-content: center;
     }
 }
+
+/* Modern Quote Form Styles (txt dosyasından) */
+.modern-quote-form {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 0;
+    margin-bottom: 30px;
+    box-shadow: 0 20px 40px rgba(102, 126, 234, 0.15);
+    overflow: hidden;
+    position: relative;
+}
+
+.modern-quote-form::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    pointer-events: none;
+}
+
+.quote-form-header {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 24px 30px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(10px);
+}
+
+.quote-form-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.quote-form-title h4 {
+    margin: 0 0 5px 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #2d3748;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.quote-form-title p {
+    margin: 0;
+    color: #718096;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.modern-form-container {
+    background: white;
+    padding: 30px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.form-field {
+    position: relative;
+}
+
+.form-field.full-width {
+    grid-column: 1 / -1;
+}
+
+.modern-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #4a5568;
+}
+
+.modern-label i {
+    color: #667eea;
+    width: 16px;
+    text-align: center;
+}
+
+.modern-input {
+    width: 100%;
+    padding: 14px 18px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 15px;
+    background: #fafafa;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+}
+
+.modern-input:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
+}
+
+.modern-input:hover {
+    border-color: #cbd5e0;
+    background: white;
+}
+
+.modern-select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+.modern-textarea {
+    resize: vertical;
+    min-height: 100px;
+    font-family: inherit;
+    line-height: 1.5;
+}
+
+.form-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: flex-end;
+    padding-top: 24px;
+    border-top: 1px solid #f1f5f9;
+    margin-top: 30px;
+}
+
+.btn-large {
+    padding: 16px 32px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+    min-width: 160px;
+    justify-content: center;
+}
+
+.btn-primary.btn-large {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary.btn-large:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary.btn-large {
+    background: #f8f9fa;
+    color: #495057;
+    border: 2px solid #e9ecef;
+}
+
+.btn-secondary.btn-large:hover {
+    background: #e9ecef;
+    transform: translateY(-1px);
+}
+
+.btn-small {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    margin-left: 8px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #667eea;
+    border: 1px solid #667eea;
+}
+
+/* Responsive Design for Quote Form */
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .quote-form-header {
+        padding: 20px;
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .quote-form-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    }
+    
+    .modern-form-container {
+        padding: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn-large {
+        width: 100%;
+    }
+}
 </style>
 
 <script>
@@ -3653,5 +4243,90 @@ jQuery(document).ready(function($) {
             form.submit();
         }
     };
+
+    // Quote toggle functionality (txt dosyasından)
+    window.toggleOfferStatus = function(newStatus) {
+        if (newStatus === 1) {
+            // Show quote form
+            document.getElementById('quote-form-section').style.display = 'block';
+            document.getElementById('quote-form-section').scrollIntoView({ behavior: 'smooth' });
+        } else {
+            // Change status to No without showing form
+            if (confirm('Teklif durumunu "Hayır" olarak değiştirmek istediğinizden emin misiniz?')) {
+                updateOfferStatusDirectly(0);
+            }
+        }
+    };
+    
+    window.cancelQuoteForm = function() {
+        document.getElementById('quote-form-section').style.display = 'none';
+    };
+    
+    function updateOfferStatusDirectly(status) {
+        const formData = new FormData();
+        formData.append('action', 'toggle_offer_status');
+        formData.append('customer_id', '<?php echo $customer->id; ?>');
+        formData.append('has_offer', status);
+        formData.append('nonce', '<?php echo wp_create_nonce("toggle_offer_status"); ?>');
+        
+        fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Hata: ' + (data.data || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Bir hata oluştu: ' + error.message);
+        });
+    }
+
+    // Teklif formu toggle
+    $('#toggle-offer-form').on('click', function() {
+        $('#offer-form').slideToggle();
+        var btn = $(this);
+        if ($('#offer-form').is(':visible')) {
+            btn.html('<i class="fas fa-minus"></i> Kapat');
+            // Bugünün tarihini default olarak ayarla
+            var today = new Date();
+            var nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+            $('#offer_expiry_date').val(nextMonth.toISOString().split('T')[0]);
+        } else {
+            btn.html('<i class="fas fa-plus"></i> Teklif Ver');
+        }
+    });
+
+    // Teklif formu iptal
+    $('#cancel-offer-form').on('click', function() {
+        $('#offer-form').slideUp();
+        $('#toggle-offer-form').html('<i class="fas fa-plus"></i> Teklif Ver');
+        if ($('#offer-form form')[0]) {
+            $('#offer-form form')[0].reset();
+        }
+    });
+    
+    // Sonlandırma modal fonksiyonları
+    window.showTerminateModal = function(customerId) {
+        var modal = document.getElementById('terminate-modal');
+        modal.style.display = 'flex'; // flex kullanarak center align
+    };
+    
+    window.closeTerminateModal = function() {
+        document.getElementById('terminate-modal').style.display = 'none';
+        document.getElementById('terminate_reason').value = '';
+    };
+    
+    // Modal dış tıklama ile kapatma
+    document.getElementById('terminate-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeTerminateModal();
+        }
+    });
 });
 </script>

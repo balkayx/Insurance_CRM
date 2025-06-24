@@ -5663,7 +5663,9 @@ if (isset($_GET['action'])) {
         $include_file = '';
         if ($action_param === 'view' && $policy_id_param > 0) {
             $include_file = 'policies-view.php';
-        } elseif (in_array($action_param, array('new', 'edit', 'renew', 'cancel'))) {
+        } elseif (in_array($action_param, array('edit', 'renew', 'cancel')) && $policy_id_param > 0) {
+            $include_file = 'policies-form-edit.php';
+        } elseif ($action_param === 'new') {
             $include_file = 'policies-form.php';
         }
 

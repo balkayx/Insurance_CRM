@@ -1298,15 +1298,24 @@ if ($current_view == 'search' && isset($_GET['keyword']) && !empty(trim($_GET['k
     if (!empty($rep_ids)) {
         $placeholders = implode(',', array_fill(0, count($rep_ids), '%d'));
         $search_query = "
-            SELECT c.*, p.policy_number, CONCAT(TRIM(c.first_name), ' ', TRIM(c.last_name)) AS customer_name
+            SELECT c.*, p.policy_number, 
+                   CASE 
+                       WHEN TRIM(COALESCE(c.company_name, '')) != '' THEN CONCAT(TRIM(c.company_name), CASE WHEN TRIM(COALESCE(c.tax_number, '')) != '' THEN CONCAT(' - VKN: ', TRIM(c.tax_number)) ELSE '' END)
+                       ELSE CONCAT(TRIM(c.first_name), ' ', TRIM(c.last_name))
+                   END AS customer_name
             FROM {$wpdb->prefix}insurance_crm_customers c
             LEFT JOIN {$wpdb->prefix}insurance_crm_policies p ON c.id = p.customer_id
             WHERE c.representative_id IN ($placeholders)
             AND (
                 CONCAT(TRIM(c.first_name), ' ', TRIM(c.last_name)) LIKE %s
-                OR TRIM(c.tc_identity) LIKE %s
-                OR TRIM(c.children_tc_identities) LIKE %s
-                OR TRIM(p.policy_number) LIKE %s
+                OR TRIM(COALESCE(c.tc_identity, '')) LIKE %s
+                OR TRIM(COALESCE(c.spouse_name, '')) LIKE %s
+                OR TRIM(COALESCE(c.spouse_tc_identity, '')) LIKE %s
+                OR TRIM(COALESCE(c.children_names, '')) LIKE %s
+                OR TRIM(COALESCE(c.children_tc_identities, '')) LIKE %s
+                OR TRIM(COALESCE(c.company_name, '')) LIKE %s
+                OR TRIM(COALESCE(c.tax_number, '')) LIKE %s
+                OR TRIM(COALESCE(p.policy_number, '')) LIKE %s
             )
             GROUP BY c.id
             ORDER BY c.first_name ASC
@@ -1314,10 +1323,15 @@ if ($current_view == 'search' && isset($_GET['keyword']) && !empty(trim($_GET['k
         ";
         
         $search_params = array_merge($rep_ids, [
-            '%' . $wpdb->esc_like($keyword) . '%',
-            '%' . $wpdb->esc_like($keyword) . '%',
-            '%' . $wpdb->esc_like($keyword) . '%',
-            '%' . $wpdb->esc_like($keyword) . '%',
+            '%' . $wpdb->esc_like($keyword) . '%', // customer name
+            '%' . $wpdb->esc_like($keyword) . '%', // customer tc
+            '%' . $wpdb->esc_like($keyword) . '%', // spouse name  
+            '%' . $wpdb->esc_like($keyword) . '%', // spouse tc
+            '%' . $wpdb->esc_like($keyword) . '%', // children names
+            '%' . $wpdb->esc_like($keyword) . '%', // children tc
+            '%' . $wpdb->esc_like($keyword) . '%', // company name
+            '%' . $wpdb->esc_like($keyword) . '%', // tax number (VKN)
+            '%' . $wpdb->esc_like($keyword) . '%', // policy number
             20
         ]);
         
@@ -1741,8 +1755,9 @@ include_once __DIR__ . '/loader.php';
                 <div class="search-box">
                     <form action="<?php echo generate_panel_url('search'); ?>" method="get">
                         <i class="dashicons dashicons-search"></i>
-                        <input type="text" name="keyword" placeholder="Ad, TC No, Çocuk Tc No.." value="<?php echo isset($_GET['keyword']) ? esc_attr($_GET['keyword']) : ''; ?>">
+                        <input type="text" name="keyword" placeholder="Ad, TC No, Eş Adı, Çocuk Adı, Firma Adı, VKN..." value="<?php echo isset($_GET['keyword']) ? esc_attr($_GET['keyword']) : ''; ?>">
                         <input type="hidden" name="view" value="search">
+                        <button type="submit" class="search-button">ARA</button>
                     </form>
                 </div>
                 
@@ -4376,7 +4391,8 @@ include_once __DIR__ . '/loader.php';
                             <table class="data-table search-results-table">
                                 <thead>
                                     <tr>
-                                        <th><?php esc_html_e('Ad Soyad', 'insurance-crm'); ?></th>
+                                        <th><?php esc_html_e('Tür', 'insurance-crm'); ?></th>
+                                        <th><?php esc_html_e('Ad Soyad / Firma Adı', 'insurance-crm'); ?></th>
                                         <th><?php esc_html_e('TC Kimlik', 'insurance-crm'); ?></th>
                                         <th><?php esc_html_e('Çocuk Ad Soyad', 'insurance-crm'); ?></th>
                                         <th><?php esc_html_e('Çocuk TC Kimlik', 'insurance-crm'); ?></th>
@@ -4385,11 +4401,29 @@ include_once __DIR__ . '/loader.php';
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($search_results as $customer): ?>
-                                        <tr>
+                                    <?php 
+                                    $row_count = 0;
+                                    foreach ($search_results as $customer): 
+                                        $row_count++;
+                                        $is_corporate = !empty(trim($customer->company_name ?? ''));
+                                        $row_class = ($row_count % 2 == 0) ? 'even-row' : 'odd-row';
+                                    ?>
+                                        <tr class="<?php echo $row_class; ?>">
                                             <td>
-                                                <a href="?view=customers&action=view&id=<?php echo esc_attr($customer->id); ?>" class="ab-customer-name">
-                                                    <?php echo esc_html($customer->customer_name); ?>
+                                                <span class="customer-type-badge <?php echo $is_corporate ? 'corporate-badge' : 'personal-badge'; ?>">
+                                                    <?php echo $is_corporate ? 'Kurumsal' : 'Kişisel'; ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="?view=customers&action=view&id=<?php echo esc_attr($customer->id); ?>" 
+                                                   class="ab-customer-name <?php echo $is_corporate ? 'corporate-customer' : ''; ?>">
+                                                    <?php 
+                                                    if ($is_corporate) {
+                                                        echo '<strong>' . esc_html($customer->customer_name) . '</strong>';
+                                                    } else {
+                                                        echo esc_html($customer->customer_name);
+                                                    }
+                                                    ?>
                                                 </a>
                                             </td>
                                             <td><?php echo esc_html($customer->tc_identity); ?></td>
@@ -4440,18 +4474,23 @@ include_once __DIR__ . '/loader.php';
             </div>
         <?php elseif ($current_view == 'organization'): ?>
             <div class="main-content">
-                <!-- Modern Header -->
-                <div class="page-header-modern">
-                    <div class="header-content">
-                        <div class="header-left">
-                            <h1><i class="fas fa-sitemap"></i> Organizasyon Yönetimi</h1>
-                            <p class="header-subtitle">Genel organizasyon yapısını görüntüleyin ve yönetin</p>
+                <!-- Kurumsal Header -->
+                <div class="ab-customer-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+                    <div class="ab-customer-title">
+                        <h1 style="color: white; margin: 0; display: flex; align-items: center; gap: 15px; font-size: 28px;">
+                            <i class="fas fa-sitemap" style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;"></i> 
+                            Organizasyon Yönetimi
+                        </h1>
+                        <div class="ab-customer-meta" style="margin-top: 10px;">
+                            <span style="color: rgba(255,255,255,0.9); font-size: 16px;">
+                                <i class="fas fa-chart-line"></i> Genel organizasyon yapısını görüntüleyin ve yönetin
+                            </span>
                         </div>
-                        <div class="header-right">
-                            <a href="<?php echo generate_panel_url('dashboard'); ?>" class="btn-modern btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Dashboard'a Dön
-                            </a>
-                        </div>
+                    </div>
+                    <div class="ab-customer-actions">
+                        <a href="<?php echo generate_panel_url('dashboard'); ?>" class="ab-btn ab-btn-secondary" style="background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.3); color: white;">
+                            <i class="fas fa-arrow-left"></i> Dashboard'a Dön
+                        </a>
                     </div>
                 </div>
                 
@@ -4768,6 +4807,7 @@ include_once __DIR__ . '/loader.php';
 // Ayarları al
 $settings = get_option('insurance_crm_settings', array());
 $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $settings['site_appearance']['sidebar_color'] : '#1e293b';
+$primary_color = isset($settings['site_appearance']['primary_color']) ? $settings['site_appearance']['primary_color'] : '#1976d2';
 ?>
 
 :root {
@@ -5578,13 +5618,20 @@ $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $setting
                 margin-right: 20px;
             }
             
+            .search-box form {
+                display: flex;
+                align-items: center;
+                position: relative;
+            }
+            
             .search-box input {
                 padding: 8px 15px 8px 35px;
                 border: 1px solid #e0e0e0;
-                border-radius: 20px;
+                border-radius: 20px 0 0 20px;
                 width: 250px;
                 font-size: 14px;
                 transition: all 0.3s;
+                border-right: none;
             }
             
             .search-box input:focus {
@@ -5600,6 +5647,25 @@ $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $setting
                 top: 50%;
                 transform: translateY(-50%);
                 color: #666;
+                z-index: 2;
+            }
+            
+            .search-button {
+                padding: 8px 15px;
+                background: #0073aa;
+                color: white;
+                border: 1px solid #0073aa;
+                border-radius: 0 20px 20px 0;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s;
+                border-left: none;
+            }
+            
+            .search-button:hover {
+                background: #005a8c;
+                border-color: #005a8c;
             }
             
             .help-icon {
@@ -8132,6 +8198,72 @@ $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $setting
                     padding: 12px;
                     margin-bottom: 10px;
                     border-radius: 8px;
+                }
+                
+                /* Search Results Table Styling */
+                .search-results-table tr.odd-row {
+                    background-color: #f8f9fa !important;
+                }
+                
+                .search-results-table tr.even-row {
+                    background-color: #ffffff !important;
+                }
+                
+                .search-results-table tr.odd-row:hover {
+                    background-color: #e9ecef !important;
+                }
+                
+                .search-results-table tr.even-row:hover {
+                    background-color: #f1f3f4 !important;
+                }
+                
+                .search-results-table tbody tr:nth-child(odd) {
+                    background-color: #f8f9fa !important;
+                }
+                
+                .search-results-table tbody tr:nth-child(even) {
+                    background-color: #ffffff !important;
+                }
+                
+                .search-results-table tbody tr:nth-child(odd):hover {
+                    background-color: #e9ecef !important;
+                }
+                
+                .search-results-table tbody tr:nth-child(even):hover {
+                    background-color: #f1f3f4 !important;
+                }
+                
+                .search-results-table .corporate-customer {
+                    font-weight: bold;
+                    color: #0066cc;
+                }
+                
+                .search-results-table .corporate-customer:hover {
+                    color: #004499;
+                    text-decoration: none;
+                }
+                
+                /* Customer Type Badges */
+                .customer-type-badge {
+                    display: inline-block;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    text-align: center;
+                    min-width: 60px;
+                }
+                
+                .corporate-badge {
+                    background: #e3f2fd;
+                    color: #1976d2;
+                    border: 1px solid #90caf9;
+                }
+                
+                .personal-badge {
+                    background: #f3e5f5;
+                    color: #7b1fa2;
+                    border: 1px solid #ce93d8;
                 }
                 
                 /* Modal improvements */

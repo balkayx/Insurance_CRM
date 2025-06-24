@@ -45,6 +45,7 @@ class Insurance_CRM_Admin {
         add_action('wp_ajax_insurance_crm_get_customer_policies', array($this, 'ajax_get_customer_policies'));
         add_action('wp_ajax_insurance_crm_test_email', array($this, 'ajax_test_email'));
         add_action('wp_ajax_insurance_crm_test_template_email', array($this, 'ajax_test_template_email'));
+        add_action('wp_ajax_get_customer_data', array($this, 'ajax_get_customer_data'));
         
         // Form handlers
         add_action('admin_post_insurance_crm_save_customer', array($this, 'handle_save_customer'));
@@ -345,6 +346,38 @@ class Insurance_CRM_Admin {
         } else {
             wp_send_json_error(__('Test e-postası gönderilemedi!', 'insurance-crm'));
         }
+    }
+
+    /**
+     * Müşteri verilerini getirir (AJAX)
+     */
+    public function ajax_get_customer_data() {
+        // Nonce kontrolü
+        if (!wp_verify_nonce($_POST['nonce'], 'insurance_crm_nonce')) {
+            wp_send_json_error(__('Güvenlik kontrolü başarısız.', 'insurance-crm'));
+            return;
+        }
+
+        $customer_id = isset($_POST['customer_id']) ? intval($_POST['customer_id']) : 0;
+        if (!$customer_id) {
+            wp_send_json_error(__('Geçersiz müşteri ID.', 'insurance-crm'));
+            return;
+        }
+
+        global $wpdb;
+        $customers_table = $wpdb->prefix . 'insurance_crm_customers';
+        
+        $customer = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $customers_table WHERE id = %d",
+            $customer_id
+        ));
+
+        if (!$customer) {
+            wp_send_json_error(__('Müşteri bulunamadı.', 'insurance-crm'));
+            return;
+        }
+
+        wp_send_json_success($customer);
     }
 
     /**

@@ -72,6 +72,7 @@ if (!current_user_can('administrator') && !current_user_can('insurance_manager')
 $policy = $wpdb->get_row($wpdb->prepare("
     SELECT p.*,
            c.first_name, c.last_name, c.tc_identity, c.phone, c.email,
+           c.spouse_name, c.spouse_tc_identity, c.children_names, c.children_tc_identities,
            u.display_name AS rep_name
     FROM $policies_table p
     LEFT JOIN {$wpdb->prefix}insurance_crm_customers c ON p.customer_id = c.id
@@ -84,6 +85,51 @@ $policy = $wpdb->get_row($wpdb->prepare("
 if (!$policy) {
     echo '<div class="ab-notice ab-error">Poliçe bulunamadı veya görüntüleme yetkiniz yok.</div>';
     return;
+}
+
+// Sigortalı listesini parse etmek için fonksiyon
+function parse_insured_list($insured_list, $policy) {
+    if (empty($insured_list)) return [];
+    
+    $insured_persons = array();
+    $names = explode(',', $insured_list);
+    
+    foreach ($names as $name) {
+        $name = trim($name);
+        if (empty($name)) continue;
+        
+        $person = array('name' => $name, 'tc' => 'Belirtilmemiş', 'type' => 'Diğer');
+        
+        // Müşterinin kendisi mi kontrol et
+        $customer_full_name = trim($policy->first_name . ' ' . $policy->last_name);
+        if ($name === $customer_full_name) {
+            $person['tc'] = $policy->tc_identity ?: 'Belirtilmemiş';
+            $person['type'] = 'Müşteri';
+        }
+        // Eş mi kontrol et
+        elseif (!empty($policy->spouse_name) && $name === trim($policy->spouse_name)) {
+            $person['tc'] = $policy->spouse_tc_identity ?: 'Belirtilmemiş';
+            $person['type'] = 'Eş';
+        }
+        // Çocuk mu kontrol et
+        elseif (!empty($policy->children_names)) {
+            $children_names = explode(',', $policy->children_names);
+            $children_tcs = !empty($policy->children_tc_identities) ? explode(',', $policy->children_tc_identities) : array();
+            
+            foreach ($children_names as $index => $child_name) {
+                $child_name = trim($child_name);
+                if ($name === $child_name) {
+                    $person['tc'] = isset($children_tcs[$index]) ? trim($children_tcs[$index]) : 'Belirtilmemiş';
+                    $person['type'] = 'Çocuk';
+                    break;
+                }
+            }
+        }
+        
+        $insured_persons[] = $person;
+    }
+    
+    return $insured_persons;
 }
 
 // Poliçe ile ilgili görevleri al
@@ -349,15 +395,6 @@ if ($is_cancelled) {
                         </div>
                     </div>
                     
-                    <?php if (!empty($policy->insured_party)): ?>
-                    <div class="info-item">
-                        <div class="item-label"><i class="fas fa-shield-alt"></i> Sigortalı</div>
-                        <div class="item-value">
-                            <span class="insured-info"><?php echo esc_html($policy->insured_party); ?></span>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-                    
                     <div class="info-list">
                         <?php if(!empty($policy->phone)): ?>
                         <div class="info-item">
@@ -378,13 +415,6 @@ if ($is_cancelled) {
                                     <i class="fas fa-envelope"></i> <?php echo esc_html($policy->email); ?>
                                 </a>
                             </div>
-                        </div>
-                        <?php endif; ?>
-                        
-                        <?php if (!empty($policy->insured_party)): ?>
-                        <div class="info-item">
-                            <div class="item-label">Sigortalayan</div>
-                            <div class="item-value highlight"><?php echo esc_html($policy->insured_party); ?></div>
                         </div>
                         <?php endif; ?>
                         
@@ -414,27 +444,29 @@ if ($is_cancelled) {
                         </h5>
                         <?php if (!empty($policy->insured_list)): ?>
                             <?php 
-                            // Sigortalılar listesi newline ile ayrılmış olduğu için explode kullan
-                            $insured_persons = explode("\n", $policy->insured_list);
-                            if (empty($insured_persons) || (count($insured_persons) == 1 && trim($insured_persons[0]) == '')) {
-                                // Fallback: comma ile ayrılmış kontrol et
-                                $insured_persons = explode(',', $policy->insured_list);
-                            }
+                            // Parse insured list with TC numbers
+                            $insured_persons = parse_insured_list($policy->insured_list, $policy);
                             
-                            foreach ($insured_persons as $insured): 
-                                $insured = trim($insured);
-                                if (!empty($insured)):
+                            foreach ($insured_persons as $person): 
+                                // Tip ikonları
+                                $icon = 'fas fa-user';
+                                if ($person['type'] === 'Müşteri') $icon = 'fas fa-user-tie';
+                                elseif ($person['type'] === 'Eş') $icon = 'fas fa-user-friends';
+                                elseif ($person['type'] === 'Çocuk') $icon = 'fas fa-child';
                             ?>
                             <div style="background: #f8f9fa; padding: 8px 12px; margin: 5px 0; border-radius: 4px; border-left: 3px solid <?php echo $corporate_color; ?>;">
-                                <span style="font-weight: 500; color: #495057;">
-                                    <i class="fas fa-user-check" style="color: <?php echo $corporate_color; ?>; margin-right: 6px;"></i>
-                                    <?php echo esc_html($insured); ?>
-                                </span>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: 500; color: #495057;">
+                                        <i class="<?php echo $icon; ?>" style="color: <?php echo $corporate_color; ?>; margin-right: 6px;"></i>
+                                        <?php echo esc_html($person['name']); ?>
+                                        <small style="color: #6c757d; margin-left: 8px;">(<?php echo esc_html($person['type']); ?>)</small>
+                                    </span>
+                                    <span style="font-size: 12px; color: #6c757d; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">
+                                        TC: <?php echo esc_html($person['tc']); ?>
+                                    </span>
+                                </div>
                             </div>
-                            <?php 
-                                endif;
-                            endforeach; 
-                            ?>
+                            <?php endforeach; ?>
                         <?php else: ?>
                             <div style="background: #f8f9fa; padding: 8px 12px; border-radius: 4px; color: #6c757d; font-style: italic;">
                                 <i class="fas fa-info-circle" style="margin-right: 6px;"></i>

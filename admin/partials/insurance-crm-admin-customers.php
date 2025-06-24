@@ -51,6 +51,12 @@ $offset = ($current_page - 1) * $per_page;
 // Arama filtresi
 $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
 
+// Yeni ayrı arama filtreleri
+$customer_name_search = isset($_GET['customer_name']) ? sanitize_text_field($_GET['customer_name']) : '';
+$company_name_search = isset($_GET['company_name']) ? sanitize_text_field($_GET['company_name']) : '';
+$tc_search = isset($_GET['tc_search']) ? sanitize_text_field($_GET['tc_search']) : '';
+$vkn_search = isset($_GET['vkn_search']) ? sanitize_text_field($_GET['vkn_search']) : '';
+
 // Durum filtresi
 $status_filter = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
 
@@ -74,12 +80,45 @@ $base_query = "FROM $customers_table c
 // Arama filtresi ekle
 if (!empty($search)) {
     $base_query .= $wpdb->prepare(
-        " AND (c.first_name LIKE %s OR c.last_name LIKE %s OR c.tc_identity LIKE %s OR c.email LIKE %s OR c.phone LIKE %s)",
+        " AND (c.first_name LIKE %s OR c.last_name LIKE %s OR c.tc_identity LIKE %s OR c.email LIKE %s OR c.phone LIKE %s OR c.company_name LIKE %s OR c.tax_number LIKE %s)",
+        '%' . $wpdb->esc_like($search) . '%',
+        '%' . $wpdb->esc_like($search) . '%',
         '%' . $wpdb->esc_like($search) . '%',
         '%' . $wpdb->esc_like($search) . '%',
         '%' . $wpdb->esc_like($search) . '%',
         '%' . $wpdb->esc_like($search) . '%',
         '%' . $wpdb->esc_like($search) . '%'
+    );
+}
+
+// Yeni ayrı arama filtreleri
+if (!empty($customer_name_search)) {
+    $base_query .= $wpdb->prepare(
+        " AND (c.first_name LIKE %s OR c.last_name LIKE %s OR CONCAT(c.first_name, ' ', c.last_name) LIKE %s)",
+        '%' . $wpdb->esc_like($customer_name_search) . '%',
+        '%' . $wpdb->esc_like($customer_name_search) . '%',
+        '%' . $wpdb->esc_like($customer_name_search) . '%'
+    );
+}
+
+if (!empty($company_name_search)) {
+    $base_query .= $wpdb->prepare(
+        " AND c.company_name LIKE %s",
+        '%' . $wpdb->esc_like($company_name_search) . '%'
+    );
+}
+
+if (!empty($tc_search)) {
+    $base_query .= $wpdb->prepare(
+        " AND c.tc_identity LIKE %s",
+        '%' . $wpdb->esc_like($tc_search) . '%'
+    );
+}
+
+if (!empty($vkn_search)) {
+    $base_query .= $wpdb->prepare(
+        " AND c.tax_number LIKE %s",
+        '%' . $wpdb->esc_like($vkn_search) . '%'
     );
 }
 
@@ -165,6 +204,12 @@ $page_links = paginate_links(array(
                     <?php endforeach; ?>
                 </select>
                 
+                <!-- Yeni ayrı arama alanları -->
+                <input type="search" name="customer_name" value="<?php echo esc_attr($customer_name_search); ?>" placeholder="Müşteri Adı" style="width: 120px;">
+                <input type="search" name="company_name" value="<?php echo esc_attr($company_name_search); ?>" placeholder="Firma Adı" style="width: 120px;">
+                <input type="search" name="tc_search" value="<?php echo esc_attr($tc_search); ?>" placeholder="TC Kimlik No" style="width: 100px;">
+                <input type="search" name="vkn_search" value="<?php echo esc_attr($vkn_search); ?>" placeholder="VKN" style="width: 80px;">
+                
                 <input type="submit" name="filter_action" id="customer-query-submit" class="button" value="Filtrele">
             </div>
             
@@ -244,7 +289,13 @@ $page_links = paginate_links(array(
                             <td class="column-name">
                                 <strong>
                                     <a href="?page=insurance-crm-customers&action=view&id=<?php echo $customer->id; ?>" class="row-title">
-                                        <?php echo esc_html($customer->first_name . ' ' . $customer->last_name); ?>
+                                        <?php 
+                                        if ($customer->category == 'kurumsal' && !empty($customer->company_name)) {
+                                            echo esc_html($customer->company_name);
+                                        } else {
+                                            echo esc_html($customer->first_name . ' ' . $customer->last_name);
+                                        }
+                                        ?>
                                     </a>
                                 </strong>
                             </td>

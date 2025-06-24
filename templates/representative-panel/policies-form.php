@@ -96,6 +96,12 @@ if (!$insured_list_exists) {
     $wpdb->query("ALTER TABLE $policies_table ADD COLUMN insured_list TEXT DEFAULT NULL AFTER insurer");
 }
 
+// YENİ: Brüt prim için sütun (Kasko/Trafik için)
+$gross_premium_exists = $wpdb->get_row("SHOW COLUMNS FROM $policies_table LIKE 'gross_premium'");
+if (!$gross_premium_exists) {
+    $wpdb->query("ALTER TABLE $policies_table ADD COLUMN gross_premium DECIMAL(10,2) DEFAULT NULL AFTER premium_amount");
+}
+
 $editing = isset($_GET['action']) && $_GET['action'] === 'edit' && isset($_GET['id']) && intval($_GET['id']) > 0;
 $renewing = isset($_GET['action']) && $_GET['action'] === 'renew' && isset($_GET['id']) && intval($_GET['id']) > 0;
 $cancelling = isset($_GET['action']) && $_GET['action'] === 'cancel' && isset($_GET['id']) && intval($_GET['id']) > 0;
@@ -110,6 +116,7 @@ $offer_amount = isset($_GET['offer_amount']) ? floatval($_GET['offer_amount']) :
 $offer_type = isset($_GET['offer_type']) ? sanitize_text_field(urldecode($_GET['offer_type'])) : '';
 $offer_file_id = isset($_GET['file_id']) ? intval($_GET['file_id']) : 0;
 $selected_customer_id = isset($_GET['customer_id']) ? intval($_GET['customer_id']) : 0;
+$customer_search_value = isset($_GET['customer_search']) ? sanitize_text_field(urldecode($_GET['customer_search'])) : '';
 
 // Oturum açmış temsilcinin ID'sini al
 $current_user_rep_id = function_exists('get_current_user_rep_id') ? get_current_user_rep_id() : 0;
@@ -258,6 +265,7 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
         'start_date' => sanitize_text_field($_POST['start_date']),
         'end_date' => sanitize_text_field($_POST['end_date']),
         'premium_amount' => floatval($_POST['premium_amount']),
+        'gross_premium' => isset($_POST['gross_premium']) ? floatval($_POST['gross_premium']) : null,
         'payment_info' => isset($_POST['payment_info']) ? sanitize_text_field($_POST['payment_info']) : '',
         'network' => isset($_POST['network']) ? sanitize_text_field($_POST['network']) : '',
         'status' => sanitize_text_field($_POST['status']),
@@ -344,7 +352,7 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
                 $message = 'Poliçe başarıyla ' . $action_text . '.';
                 $message_type = 'success';
                 $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
-                $redirect_url = build_redirect_url_with_filters(['view' => 'policies', 'updated' => 'true']);
+                $redirect_url = build_redirect_url_with_filters(['view' => 'policies', 'action' => 'view', 'id' => $policy_id]);
                 wp_redirect($redirect_url);
                 exit;
             } else {
@@ -397,10 +405,40 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
         
         if ($result) {
             $new_policy_id = $wpdb->insert_id;
+            
+            // If this policy was created from an offer, update the customer's offer status
+            if (!empty($customer_search_value) && (!empty($offer_type) || !empty($offer_amount))) {
+                $customer_name_parts = explode(' ', trim($customer_search_value));
+                if (count($customer_name_parts) >= 2) {
+                    $first_name = $customer_name_parts[0];
+                    $last_name = implode(' ', array_slice($customer_name_parts, 1));
+                    
+                    // Find customer by name and update offer status
+                    $customer_for_offer_update = $wpdb->get_row($wpdb->prepare(
+                        "SELECT id FROM {$wpdb->prefix}insurance_crm_customers 
+                        WHERE first_name = %s AND last_name = %s AND has_offer = 1 
+                        LIMIT 1",
+                        $first_name, $last_name
+                    ));
+                    
+                    if ($customer_for_offer_update) {
+                        $wpdb->update(
+                            $wpdb->prefix . 'insurance_crm_customers',
+                            array(
+                                'has_offer' => 2, // 2 = Completed/Converted to Policy
+                                'offer_notes' => 'Teklif poliçeye dönüştürüldü. Poliçe ID: ' . $new_policy_id
+                            ),
+                            array('id' => $customer_for_offer_update->id)
+                        );
+                        error_log("Offer status updated for customer ID: " . $customer_for_offer_update->id . " to completed");
+                    }
+                }
+            }
+            
             $message = 'Poliçe başarıyla eklendi.';
             $message_type = 'success';
             $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
-            $redirect_url = build_redirect_url_with_filters(['view' => 'policies', 'added' => 'true']);
+            $redirect_url = build_redirect_url_with_filters(['view' => 'policies', 'action' => 'view', 'id' => $new_policy_id]);
             wp_redirect($redirect_url);
             exit;
         } else {
@@ -1052,6 +1090,12 @@ body {
         display: block;
     }
     
+    /* Force show policy details in edit/renewal modes */
+    body.edit-mode .policy-details-step,
+    body.renewal-mode .policy-details-step {
+        display: block !important;
+    }
+    
     .form-textarea {
         min-height: 100px;
     }
@@ -1448,8 +1492,12 @@ if ($user_role == 1 || $user_role == 2):
                                     <input type="text" id="customer_search" class="ab-input" 
                                            placeholder="Ad soyad, TC kimlik no, şirket adı veya vergi no ile arayın..."
                                            value="<?php 
+                                           // URL'den gelen customer_search parametresi öncelik
+                                           if (!empty($customer_search_value)) {
+                                               echo esc_attr($customer_search_value);
+                                           }
                                            // Sadece düzenleme, iptal, yenileme veya tekliften oluşturma modlarında müşteri adını göster
-                                           if (($editing || $cancelling || $renewing || $create_from_offer) && isset($customer) && $customer) {
+                                           elseif (($editing || $cancelling || $renewing || $create_from_offer) && isset($customer) && $customer) {
                                                echo esc_attr($customer->first_name . ' ' . $customer->last_name);
                                            } else {
                                                echo ''; // Yeni poliçe modunda boş bırak
@@ -1514,7 +1562,7 @@ if ($user_role == 1 || $user_role == 2):
                         </div>
                         
                         <!-- SİGORTALI BELİRLEME SORUSU -->
-                        <div id="insured_question" class="insured-question" style="display: <?php echo $cancelling ? 'none' : 'block'; ?>;">
+                        <div id="insured_question" class="insured-question" style="display: <?php echo ($cancelling || $editing || $renewing) ? 'none' : 'block'; ?>;">
                             <h4><i class="fas fa-question-circle"></i> Sigorta Ettiren ile Sigortalı aynı kişi mi?</h4>
                             <div class="ab-form-row">
                                 <div class="ab-form-group">
@@ -1690,6 +1738,16 @@ if ($user_role == 1 || $user_role == 2):
                                        step="0.01" min="0" required placeholder="Prim tutarı giriniz">
                             </div>
                             
+                            <!-- Brüt Prim Alanı (Kasko/Trafik için) -->
+                            <div class="ab-form-group" id="gross_premium_group" style="display: none;">
+                                <label for="gross_premium">Brüt Prim (₺)</label>
+                                <input type="number" name="gross_premium" id="gross_premium" class="ab-input" 
+                                       value="<?php echo isset($policy) && $policy->gross_premium > 0 ? esc_attr($policy->gross_premium) : ''; ?>" 
+                                       step="0.01" min="0" placeholder="Brüt prim tutarı giriniz">
+                            </div>
+                        </div>
+                        
+                        <div class="ab-form-row">
                             <div class="ab-form-group">
                                 <label for="payment_info">Ödeme Bilgisi</label>
                                 <select name="payment_info" id="payment_info" class="ab-select">
@@ -1791,13 +1849,8 @@ if ($user_role == 1 || $user_role == 2):
                     </div>
                 </div>
                 
-                <!-- SİGORTALI BİLGİLERİ (gizli alan) -->
-                <input type="hidden" name="insured_party" id="insured_party_hidden" value="<?php echo isset($policy) && !empty($policy->insured_party) ? esc_attr($policy->insured_party) : ''; ?>">
-                <input type="hidden" name="insured_party_list" id="insured_party_list_hidden" value="<?php echo isset($policy) && !empty($policy->insured_list) ? esc_attr($policy->insured_list) : ''; ?>">
-            </div>
-            
-            <!-- FORM AKSİYONLARI -->
-            <div class="ab-form-actions">
+                <!-- FORM AKSİYONLARI -->
+                <div class="ab-form-actions">
                 <div class="ab-form-actions-left">
                     <a href="<?php echo esc_url(build_redirect_url_with_filters(['view' => 'policies'])); ?>" class="ab-btn ab-btn-secondary">
                         <i class="fas fa-times"></i> İptal
@@ -1830,30 +1883,72 @@ document.addEventListener('DOMContentLoaded', function() {
     const isCancelMode = <?php echo $cancelling ? 'true' : 'false'; ?>;
     const isCreateFromOfferMode = <?php echo $create_from_offer ? 'true' : 'false'; ?>;
     
+    // Body'ye mod class'ları ekle
+    if (isEditMode) document.body.classList.add('edit-mode');
+    if (isRenewMode) document.body.classList.add('renewal-mode');
+    if (isCancelMode) document.body.classList.add('cancel-mode');
+    if (isCreateFromOfferMode) document.body.classList.add('create-from-offer-mode');
+    
     console.log('📋 Mod bilgileri:', {
         isEditMode, isRenewMode, isCancelMode, isCreateFromOfferMode
     });
     
     if (isEditMode || isCancelMode) {
         console.log('✏️ Düzenleme/İptal modunda - Tüm bölümler gösteriliyor');
+        
+        // Önce UI elementlerini göster
+        const selectedCustomerDetails = document.getElementById('selected_customer_details');
+        const insuredQuestion = document.getElementById('insured_question');
+        if (selectedCustomerDetails) selectedCustomerDetails.style.display = 'block';
+        if (insuredQuestion) insuredQuestion.style.display = 'block';
+        
+        // Poliçe detaylarını zorla göster
         showPolicyDetailsSteps();
+        
+        // Ek güvenlik için setTimeout ile tekrar çalıştır
+        setTimeout(() => {
+            showPolicyDetailsSteps();
+            console.log('🔄 Düzenleme modunda poliçe detayları tekrar gösterildi');
+        }, 100);
+        
         setupExistingFunctionality();
+        
+        // Müşteri bilgilerini ve aile üyelerini otomatik yükle
+        const customerId = document.getElementById('selected_customer_id').value;
+        if (customerId) {
+            console.log('📋 Düzenleme modunda müşteri verileri yükleniyor, ID:', customerId);
+            setupExistingCustomerData(customerId);
+        }
         return;
     }
     
     // Yenileme modunda da poliçe detaylarını göster
     if (isRenewMode) {
         console.log('🔄 Yenileme modunda - Müşteri seçili, poliçe detayları gösteriliyor');
+        
         // Müşteri bilgileri zaten seçili
         if (selectedCustomerDetails) selectedCustomerDetails.style.display = 'block';
         if (insuredQuestion) insuredQuestion.style.display = 'block';
         
-        // Poliçe detaylarını otomatik göster
+        // Poliçe detaylarını otomatik göster - zorla
         showPolicyDetailsSteps();
+        
+        // Ek güvenlik için setTimeout ile tekrar çalıştır
+        setTimeout(() => {
+            showPolicyDetailsSteps();
+            console.log('🔄 Yenileme modunda poliçe detayları tekrar gösterildi');
+        }, 100);
         
         // Etkileşimli akış ve mevcut işlevsellik
         setupInteractiveFlow();
         setupExistingFunctionality();
+        
+        // Müşteri bilgilerini ve aile üyelerini otomatik yükle
+        const customerId = document.getElementById('selected_customer_id').value;
+        if (customerId) {
+            console.log('📋 Yenileme modunda müşteri verileri yükleniyor, ID:', customerId);
+            setupExistingCustomerData(customerId);
+        }
         return;
     }
     
@@ -1867,6 +1962,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Poliçe detaylarını otomatik göster
         showPolicyDetailsSteps();
+
+        // Create from offer modunda müşteri verilerini yükle
+        if (isCreateFromOfferMode) {
+            const customerId = document.getElementById('selected_customer_id')?.value;
+            if (customerId) {
+                console.log('📝 Teklif modunda müşteri ID bulundu:', customerId);
+                setupExistingCustomerData(customerId);
+            }
+        }
         
         // Etkileşimli akış ve mevcut işlevsellik
         setupInteractiveFlow();
@@ -1878,7 +1982,40 @@ document.addEventListener('DOMContentLoaded', function() {
     // Yeni ekleme modunda etkileşimli akış
     setupInteractiveFlow();
     setupExistingFunctionality();
+    
+    // URL'den customer_search parametresi varsa otomatik arama başlat
+    const customerSearchValue = document.getElementById('customer_search').value;
+    if (customerSearchValue && customerSearchValue.trim() !== '') {
+        console.log('🔍 URL parametresinden müşteri aranıyor:', customerSearchValue);
+        setTimeout(() => {
+            searchCustomers(customerSearchValue.trim(), true); // Auto-select flag
+        }, 100);
+    }
 });
+
+// Düzenleme/yenileme modunda mevcut müşteri verilerini kurulum
+function setupExistingCustomerData(customerId) {
+    console.log('🔧 Mevcut müşteri verileri kuruluyor, ID:', customerId);
+    
+    // UI elementlerini göster
+    const selectedCustomerDetails = document.getElementById('selected_customer_details');
+    const insuredQuestion = document.getElementById('insured_question');
+    const familyMembersSelection = document.getElementById('family_members_selection');
+    
+    if (selectedCustomerDetails) selectedCustomerDetails.style.display = 'block';
+    if (insuredQuestion) insuredQuestion.style.display = 'block';
+    
+    // Müşteri verilerini yükle
+    loadExistingCustomerData(customerId);
+    
+    // Aile üyelerini yükle (düzenleme modunda da gerekli)
+    loadFamilyMembers(customerId);
+    
+    // Sigortalı seçimlerini geri yükle
+    setTimeout(() => {
+        restorePreviousInsuredSelections();
+    }, 500);
+}
 
 function setupInteractiveFlow() {
     console.log('🚀 Etkileşimli akış başlatılıyor...');
@@ -1944,8 +2081,8 @@ function setupInteractiveFlow() {
     });
     
     // Müşteri arama fonksiyonu
-    function searchCustomers(query) {
-        console.log('🔍 Müşteri aranıyor:', query);
+    function searchCustomers(query, autoSelect = false) {
+        console.log('🔍 Müşteri aranıyor:', query, autoSelect ? '(otomatik seçim aktif)' : '');
         
         // AJAX URL kontrolü
         const ajaxUrl = '<?php echo admin_url('admin-ajax.php'); ?>';
@@ -1994,7 +2131,7 @@ function setupInteractiveFlow() {
                 const data = JSON.parse(text);
                 console.log('✅ JSON parse başarılı:', data);
                 if (data.success && data.data) {
-                    displaySearchResults(data.data);
+                    displaySearchResults(data.data, autoSelect);
                 } else {
                     console.log('❌ Arama başarısız:', data.data || 'Veri yok');
                     searchResults.innerHTML = '<div class="search-result-item"><i class="fas fa-exclamation-circle"></i> Müşteri bulunamadı</div>';
@@ -2061,7 +2198,7 @@ function setupInteractiveFlow() {
     }
     
     // Arama sonuçlarını göster
-    function displaySearchResults(customers) {
+    function displaySearchResults(customers, autoSelect = false) {
         if (customers.length === 0) {
             searchResults.innerHTML = '<div class="search-result-item"><i class="fas fa-info-circle"></i> Müşteri bulunamadı</div>';
             return;
@@ -2085,6 +2222,16 @@ function setupInteractiveFlow() {
             `;
         });
         searchResults.innerHTML = html;
+        
+        // Auto-select first customer if requested and there's exactly one result
+        if (autoSelect && customers.length === 1) {
+            console.log('🎯 Tek sonuç bulundu, otomatik seçiliyor:', customers[0]);
+            setTimeout(() => {
+                selectCustomer(customers[0]);
+                searchResults.style.display = 'none';
+            }, 500);
+            return;
+        }
         
         // Müşteri seçim event'i
         searchResults.querySelectorAll('.search-result-item').forEach((item, index) => {
@@ -2130,6 +2277,18 @@ function setupInteractiveFlow() {
         // Sigortalı soru bölümünü göster
         insuredQuestion.style.display = 'block';
         
+        // Sigortalı soru bölümüne odaklan
+        setTimeout(() => {
+            const insuredQuestionElement = document.getElementById('insured_question');
+            if (insuredQuestionElement) {
+                insuredQuestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const firstRadio = insuredQuestionElement.querySelector('input[name="same_as_insured"]');
+                if (firstRadio) {
+                    firstRadio.focus();
+                }
+            }
+        }, 300);
+        
         // Varsayılan "Evet" seçili olduğu için poliçe detaylarını da göster
         const defaultRadio = document.querySelector('input[name="same_as_insured"][value="yes"]');
         if (defaultRadio && defaultRadio.checked) {
@@ -2150,6 +2309,49 @@ function setupInteractiveFlow() {
         document.getElementById('selected_customer_email').value = customer.email || 'Belirtilmemiş';
         
         selectedCustomerDetails.style.display = 'block';
+    }
+    
+    // Düzenleme/yenileme modunda mevcut müşteri verilerini yükle
+    function loadExistingCustomerData(customerId) {
+        console.log('📋 Mevcut müşteri verileri yükleniyor, ID:', customerId);
+        
+        // AJAX isteği ile müşteri verilerini al
+        const formData = new FormData();
+        formData.append('action', 'get_customer_data');
+        formData.append('customer_id', customerId);
+        formData.append('nonce', '<?php echo wp_create_nonce('insurance_crm_nonce'); ?>');
+        
+        fetch(ajaxurl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                console.log('✅ Müşteri verileri başarıyla yüklendi:', data.data);
+                
+                // Global selectedCustomer değişkenini ayarla
+                selectedCustomer = data.data;
+                window.selectedCustomer = data.data;
+                
+                // Müşteri detaylarını göster
+                displayCustomerDetails(data.data);
+                
+                // Müşteri seçim bölümünü tamamlanmış olarak işaretle
+                document.querySelector('.customer-selection-step').classList.add('completed');
+                
+                // Arama alanını da güncelle
+                const customerSearch = document.getElementById('customer_search');
+                if (customerSearch && !customerSearch.readOnly) {
+                    customerSearch.value = `${data.data.first_name} ${data.data.last_name}`;
+                }
+            } else {
+                console.error('❌ Müşteri verileri yüklenirken hata:', data);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Müşteri verileri yükleme hatası:', error);
+        });
     }
     
     // Aile üyelerini yükle - client-side alternatif yöntem
@@ -2306,6 +2508,33 @@ function setupInteractiveFlow() {
         checkboxes.forEach(checkbox => {
             checkbox.addEventListener('change', updateInsuredPersonsField);
         });
+        
+        // Düzenleme modunda mevcut seçimleri geri yükle
+        if (isEditMode || isRenewMode) {
+            restorePreviousInsuredSelections();
+        }
+    }
+    
+    // Mevcut sigortalı seçimlerini geri yükle
+    function restorePreviousInsuredSelections() {
+        const existingInsuredList = document.getElementById('insured_party_list_hidden').value;
+        if (!existingInsuredList) return;
+        
+        console.log('🔄 Mevcut sigortalı seçimleri geri yükleniyor:', existingInsuredList);
+        
+        const insuredNames = existingInsuredList.split(',').map(name => name.trim());
+        const checkboxes = document.querySelectorAll('input[name="insured_persons[]"]');
+        
+        checkboxes.forEach(checkbox => {
+            const checkboxValue = checkbox.value.trim();
+            if (insuredNames.includes(checkboxValue)) {
+                checkbox.checked = true;
+                console.log('✅ Seçim geri yüklendi:', checkboxValue);
+            }
+        });
+        
+        // Seçimleri güncelle
+        updateInsuredPersonsField();
     }
     
     // Aile üyelerini göster
@@ -2500,6 +2729,9 @@ function setupInteractiveFlow() {
         if (customerId) {
             insuredQuestion.style.display = 'block';
             
+            // Müşteri bilgilerini yükle ve göster
+            loadExistingCustomerData(customerId);
+            
             // Yenileme modunda aile üyelerini de yükle
             if (isRenewMode) {
                 loadFamilyMembers(customerId);
@@ -2525,30 +2757,33 @@ function showPolicyDetailsSteps() {
     const policySteps = document.querySelectorAll('.policy-details-step');
     const submitButton = document.getElementById('submit_button');
     
-    policySteps.forEach(el => {
+    console.log('🔍 Bulunan policy-details-step sayısı:', policySteps.length);
+    
+    policySteps.forEach((el, index) => {
+        console.log(`📋 Step ${index + 1} gösteriliyor:`, el);
         el.classList.add('active');
         el.style.display = 'block';
+        el.style.visibility = 'visible';
+        el.style.opacity = '1';
     });
     
     if (submitButton) {
         submitButton.style.display = 'inline-flex';
+        console.log('✅ Submit butonu gösterildi');
     }
     
-    // Sayfayı poliçe detaylarına yumuşak geçiş yap
-    setTimeout(() => {
-        const firstPolicySection = document.querySelector('.policy-details-step');
-        if (firstPolicySection) {
-            firstPolicySection.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
-        }
-    }, 300);
+    // Brüt prim alanını kontrol et ve göster (edit/renewal modunda)
+    updateGrossPremiumField();
+    
+    console.log('✅ Poliçe detayları bölümleri başarıyla gösterildi');
 }
 
 function setupExistingFunctionality() {
     // Kasko/Trafik seçiminde plaka alanını göster/gizle
     updatePlateField();
+    
+    // Kasko/Trafik seçiminde brüt prim alanını göster/gizle
+    updateGrossPremiumField();
     
     // Sigorta şirketi ve poliçe kategorisi önceden seçili ise kontrol et
     const policyCategory = document.getElementById('policy_category');
@@ -2589,9 +2824,7 @@ function setupExistingFunctionality() {
         startDateInput.addEventListener('change', function() {
             // Başlangıç tarihi değiştiğinde, bitiş tarihini otomatik olarak 1 yıl sonraya ayarla
             const startDate = new Date(this.value);
-            const endDate = new Date(endDateInput.value);
-            
-            if (startDate >= endDate) {
+            if (this.value) {
                 const newEndDate = new Date(startDate);
                 newEndDate.setFullYear(newEndDate.getFullYear() + 1);
                 endDateInput.value = newEndDate.toISOString().split('T')[0];
@@ -2602,7 +2835,10 @@ function setupExistingFunctionality() {
     // Poliçe türü değiştiğinde plaka alanını kontrol et
     const policyTypeSelect = document.getElementById('policy_type');
     if (policyTypeSelect) {
-        policyTypeSelect.addEventListener('change', updatePlateField);
+        policyTypeSelect.addEventListener('change', function() {
+            updatePlateField();
+            updateGrossPremiumField();
+        });
     }
     
     // Diğer form olaylarını kur
@@ -2796,6 +3032,28 @@ function updatePlateField() {
     }
 }
 
+// Kasko/Trafik seçiminde brüt prim alanını göster/gizle
+function updateGrossPremiumField() {
+    const policyTypeSelect = document.getElementById('policy_type');
+    const grossPremiumGroup = document.getElementById('gross_premium_group');
+    
+    if (!policyTypeSelect || !grossPremiumGroup) return;
+    
+    const policyType = policyTypeSelect.value.toLowerCase();
+    
+    // Kasko veya Trafik seçiliyse brüt prim alanını göster
+    if (policyType === 'kasko' || policyType === 'trafik') {
+        grossPremiumGroup.style.display = 'block';
+    } else {
+        // Diğer poliçe türleri için brüt prim alanını gizle
+        grossPremiumGroup.style.display = 'none';
+        const grossPremiumInput = document.getElementById('gross_premium');
+        if (grossPremiumInput) {
+            grossPremiumInput.value = ''; // Brüt prim değerini temizle
+        }
+    }
+}
+
 // AJAX endpoint'i için destek
 var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
 
@@ -2803,6 +3061,7 @@ var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
 window.addEventListener('load', function() {
     setTimeout(function() {
         updatePlateField(); // Poliçe türüne göre plaka alanını kontrol et
+        updateGrossPremiumField(); // Poliçe türüne göre brüt prim alanını kontrol et
         
         // Sigorta şirketi ve poliçe kategorisi için varsayılan değerler
         const insuranceCompany = document.getElementById('insurance_company');

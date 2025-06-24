@@ -648,3 +648,25 @@ function insurance_crm_rep_panel_assets() {
     wp_enqueue_style('google-fonts-inter', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap', array(), null);
 }
 add_action('wp_enqueue_scripts', 'insurance_crm_rep_panel_assets');
+
+// AJAX handler for dismissing policy prompt
+add_action('wp_ajax_dismiss_policy_prompt', 'insurance_crm_dismiss_policy_prompt');
+function insurance_crm_dismiss_policy_prompt() {
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'dismiss_policy_prompt')) {
+        wp_die('Security check failed');
+    }
+    
+    // Clear session variables
+    if (isset($_SESSION['show_policy_prompt'])) {
+        unset($_SESSION['show_policy_prompt']);
+    }
+    if (isset($_SESSION['new_customer_id'])) {
+        unset($_SESSION['new_customer_id']);
+    }
+    if (isset($_SESSION['new_customer_name'])) {
+        unset($_SESSION['new_customer_name']);
+    }
+    
+    wp_send_json_success();
+}

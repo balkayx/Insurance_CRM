@@ -281,7 +281,17 @@ $per_page = 15;
 $offset = ($current_page - 1) * $per_page;
 
 // FİLTRELEME PARAMETRELERİ - Düzeltilmiş
+$customer_name_filter = isset($_GET['customer_name']) ? sanitize_text_field($_GET['customer_name']) : '';
+$company_name_filter = isset($_GET['company_name']) ? sanitize_text_field($_GET['company_name']) : '';
+$tc_identity_filter = isset($_GET['tc_identity']) ? sanitize_text_field($_GET['tc_identity']) : '';  
+$tax_number_filter = isset($_GET['tax_number']) ? sanitize_text_field($_GET['tax_number']) : '';
+
+// Legacy support for old search parameter
 $search = isset($_GET['customer_name']) ? sanitize_text_field($_GET['customer_name']) : '';
+if (empty($search) && !empty($customer_name_filter)) {
+    $search = $customer_name_filter;
+}
+
 $status_filter = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
 $category_filter = isset($_GET['category']) ? sanitize_text_field($_GET['category']) : '';
 $representative_filter = isset($_GET['rep_id']) ? intval($_GET['rep_id']) : 0;
@@ -345,8 +355,34 @@ elseif ($access_level == 'ekip_lideri') {
 
 // Patron, Müdür ve Müdür Yardımcısı tüm müşterileri görebilir (ek filtreleme yok)
 
-// Arama filtresi - Müşteri adı ile arama
-if (!empty($search)) {
+// Arama filtreleri - Ayrı alanlar için
+if (!empty($customer_name_filter)) {
+    $base_query .= $wpdb->prepare(
+        " AND (
+            c.first_name LIKE %s 
+            OR c.last_name LIKE %s 
+            OR CONCAT(c.first_name, ' ', c.last_name) LIKE %s
+        )",
+        '%' . $wpdb->esc_like($customer_name_filter) . '%',
+        '%' . $wpdb->esc_like($customer_name_filter) . '%',
+        '%' . $wpdb->esc_like($customer_name_filter) . '%'
+    );
+}
+
+if (!empty($company_name_filter)) {
+    $base_query .= $wpdb->prepare(" AND c.company_name LIKE %s", '%' . $wpdb->esc_like($company_name_filter) . '%');
+}
+
+if (!empty($tc_identity_filter)) {
+    $base_query .= $wpdb->prepare(" AND c.tc_identity = %s", $tc_identity_filter);
+}
+
+if (!empty($tax_number_filter)) {
+    $base_query .= $wpdb->prepare(" AND c.tax_number = %s", $tax_number_filter);
+}
+
+// Legacy search support - Müşteri adı ile arama
+if (!empty($search) && empty($customer_name_filter)) {
     $base_query .= $wpdb->prepare(
         " AND (
             c.first_name LIKE %s 
@@ -358,6 +394,8 @@ if (!empty($search)) {
         '%' . $wpdb->esc_like($search) . '%'
     );
 }
+
+
 
 // Durum ve kategori filtreleri
 if (!empty($status_filter)) {
@@ -776,6 +814,15 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
         </div>
     </header>
 
+    <!-- Date Filter Section - Same style as policies.php -->
+    <div class="date-filter-section">
+        <form method="GET" class="date-filter-form" id="customerSearchForm">
+            <input type="hidden" name="view" value="<?php echo esc_attr($view_type); ?>">
+            
+
+        </form>
+    </div>
+
     <!-- Filters Section -->
     <section class="filters-section <?php echo $active_filter_count === 0 ? 'hidden' : ''; ?>" id="filtersSection">
         <div class="filters-container">
@@ -784,24 +831,31 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
                 
                 <div class="filters-grid">
                     <div class="filter-group">
-                        <label for="filter_search">Müşteri Adı</label>
-                        <input type="text" id="filter_search" name="customer_name" 
-                               value="<?php echo esc_attr($search); ?>" 
-                               placeholder="Müşteri Adı ile ara..." class="form-input">
+                        <label for="customer_name">Müşteri Adı</label>
+                        <input type="text" id="customer_name" name="customer_name" 
+                               value="<?php echo esc_attr($customer_name_filter); ?>" 
+                               placeholder="Müşteri Ad Soyad..." class="form-input">
                     </div>
 
                     <div class="filter-group">
-                        <label for="filter_customer_tc">TC Kimlik No</label>
-                        <input type="text" id="filter_customer_tc" name="customer_tc" 
-                               value="<?php echo esc_attr($customer_tc_filter); ?>" 
-                               placeholder="TC Kimlik No ile ara..." class="form-input">
+                        <label for="company_name">Firma Adı</label>
+                        <input type="text" id="company_name" name="company_name" 
+                               value="<?php echo esc_attr($company_name_filter); ?>" 
+                               placeholder="Kurumsal Firma Adı..." class="form-input">
                     </div>
 
                     <div class="filter-group">
-                        <label for="filter_customer_vkn">VKN ile Ara</label>
-                        <input type="text" id="filter_customer_vkn" name="customer_vkn" 
-                               value="<?php echo esc_attr($customer_vkn_filter); ?>" 
-                               placeholder="Vergi Kimlik Numarası ile ara..." class="form-input">
+                        <label for="tc_identity">TC Kimlik No</label>
+                        <input type="text" id="tc_identity" name="tc_identity" 
+                               value="<?php echo esc_attr($tc_identity_filter); ?>" 
+                               placeholder="TC Kimlik No..." class="form-input">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="tax_number">VKN</label>
+                        <input type="text" id="tax_number" name="tax_number" 
+                               value="<?php echo esc_attr($tax_number_filter); ?>" 
+                               placeholder="Vergi Kimlik Numarası..." class="form-input">
                     </div>
 
                     <div class="filter-group">
@@ -929,14 +983,18 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
                 </div>
 
                 <div class="filters-actions">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i>
-                        <span>Filtrele</span>
+                    <button type="button" onclick="fixAllNames()" class="btn btn-warning fix-names-btn">
+                        <i class="fas fa-text-height"></i>
+                        <span>İSİMLERİ DÜZELT</span>
                     </button>
                     <a href="?view=<?php echo esc_attr($view_type); ?>" class="btn btn-outline">
                         <i class="fas fa-undo"></i>
                         <span>Sıfırla</span>
                     </a>
+                    <button type="submit" class="btn btn-primary" onclick="hideFilterSectionAfterSubmit()">
+                        <i class="fas fa-search"></i>
+                        <span>Filtrele</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -1544,15 +1602,8 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
                                 <td class="customer-name" data-label="Müşteri">
                                     <a href="?view=<?php echo esc_attr($view_type); ?>&action=view&id=<?php echo $customer->id; ?>" class="customer-link">
                                         <?php 
-                                        // Proper Turkish uppercase conversion
-                                        $customer_name = mb_strtoupper($customer->customer_name, 'UTF-8');
-                                        // Convert specific Turkish characters to proper uppercase
-                                        $customer_name = str_replace(
-                                            ['ı', 'i', 'İ'],
-                                            ['I', 'İ', 'İ'],
-                                            $customer_name
-                                        );
-                                        echo esc_html($customer_name); 
+                                        // Display name as stored in database
+                                        echo esc_html($customer->customer_name); 
                                         ?>
                                     </a>
                                     <?php if (!empty($customer->company_name)): ?>
@@ -1865,6 +1916,89 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
     margin-bottom: var(--spacing-xl);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--outline-variant);
+}
+
+/* Quick Search Styles */
+.quick-search-section {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--outline-variant);
+}
+
+.quick-search-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.quick-search-form {
+    width: 100%;
+}
+
+.search-input-group {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.quick-search-input {
+    flex: 1;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 2px solid var(--outline);
+    border-right: none;
+    border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+    font-size: var(--text-md);
+    background: var(--surface);
+    color: var(--on-surface);
+    outline: none;
+    transition: all var(--transition-base);
+}
+
+.quick-search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
+}
+
+.quick-search-input::placeholder {
+    color: var(--on-surface-variant);
+    opacity: 0.7;
+}
+
+.quick-search-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-xl);
+    background: var(--primary);
+    color: var(--on-primary);
+    border: 2px solid var(--primary);
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+    font-weight: 600;
+    font-size: var(--text-md);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.quick-search-btn:hover {
+    background: var(--primary-variant);
+    border-color: var(--primary-variant);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.quick-search-btn:active {
+    transform: translateY(0);
+}
+
+.quick-search-btn i {
+    font-size: 1.1em;
 }
 
 .header-content {
@@ -2221,9 +2355,21 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
 .filters-actions {
     display: flex;
     gap: var(--spacing-md);
+    align-items: center;
     justify-content: flex-end;
+    flex-wrap: wrap;
     padding-top: var(--spacing-lg);
     border-top: 1px solid var(--outline-variant);
+    margin-top: var(--spacing-lg);
+}
+
+.fix-names-btn {
+    margin-right: auto; /* Push to the far left */
+}
+
+.filters-actions .btn {
+    min-width: 120px;
+    justify-content: center;
 }
 
 /* Dashboard Section */
@@ -2533,9 +2679,10 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
 }
 
 .company-name {
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-base);
     color: var(--on-surface-variant);
     margin-top: var(--spacing-xs);
+    font-weight: bold;
 }
 
 .customer-badges {
@@ -2768,6 +2915,31 @@ $debug_mode = false; // Geliştirici modu - aktifleştirirseniz SQL sorguların�
     .header-content {
         flex-direction: column;
         align-items: stretch;
+    }
+    
+    .quick-search-section {
+        padding: var(--spacing-md);
+    }
+    
+    .search-input-group {
+        flex-direction: column;
+        border-radius: var(--radius-lg);
+    }
+    
+    .quick-search-input,
+    .quick-search-btn {
+        border-radius: var(--radius-lg);
+        border: 2px solid var(--outline);
+    }
+    
+    .quick-search-input {
+        margin-bottom: var(--spacing-sm);
+        border-bottom: 2px solid var(--outline);
+    }
+    
+    .quick-search-btn {
+        justify-content: center;
+        padding: var(--spacing-md);
     }
 
     .header-actions {
@@ -3755,6 +3927,57 @@ class ModernCustomersApp {
         console.log('  ✓ Responsive tasarım korundu');
         console.log('🎯 Sistem üretim için hazır ve tamamen işlevsel');
     }
+}
+
+// Filter section auto-hide functionality
+function hideFilterSectionAfterSubmit() {
+    setTimeout(() => {
+        const filterSection = document.getElementById('filterSection');
+        const filterToggle = document.getElementById('filterToggle');
+        if (filterSection && filterToggle) {
+            filterSection.classList.remove('show');
+            filterToggle.querySelector('.chevron').style.transform = 'rotate(0deg)';
+        }
+    }, 100);
+}
+
+// Name fixing functionality
+function fixAllNames() {
+    if (!confirm('Tüm müşteri isimlerini düzeltmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
+        return;
+    }
+    
+    const fixBtn = document.querySelector('button[onclick="fixAllNames()"]');
+    const originalText = fixBtn.innerHTML;
+    fixBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>İşleniyor...</span>';
+    fixBtn.disabled = true;
+    
+    // AJAX request to fix names
+    const formData = new FormData();
+    formData.append('action', 'fix_all_names');
+    formData.append('nonce', '<?php echo wp_create_nonce("fix_names_nonce"); ?>');
+    
+    fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('İsimler başarıyla düzeltildi! ' + data.data.fixed_count + ' kayıt güncellendi.');
+            window.location.reload();
+        } else {
+            alert('Hata: ' + (data.data || 'Bilinmeyen hata'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu: ' + error.message);
+    })
+    .finally(() => {
+        fixBtn.innerHTML = originalText;
+        fixBtn.disabled = false;
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
