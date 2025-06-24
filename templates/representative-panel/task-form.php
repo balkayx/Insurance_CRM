@@ -118,6 +118,30 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'add_task') {
     }
 }
 
+// AJAX handler for getting customer policies in task form
+if (isset($_POST['action']) && $_POST['action'] === 'get_customer_policies_task_form') {
+    if (!wp_verify_nonce($_POST['nonce'], 'get_policies_task_nonce')) {
+        echo json_encode(['success' => false, 'message' => 'Güvenlik kontrolü başarısız']);
+        exit;
+    }
+    
+    $customer_id = intval($_POST['customer_id']);
+    
+    // customers-view.php'deki sorguyu kullan
+    $policies_table = $wpdb->prefix . 'insurance_crm_policies';
+    $policies = $wpdb->get_results($wpdb->prepare("
+        SELECT * FROM $policies_table 
+        WHERE customer_id = %d
+        ORDER BY end_date ASC
+    ", $customer_id));
+    
+    echo json_encode([
+        'success' => true,
+        'policies' => $policies ?: []
+    ]);
+    exit;
+}
+
 // Müşteri temsilcilerini çek (policies-form.php referansı ile)
 $representatives_table = $wpdb->prefix . 'insurance_crm_representatives';
 $users = $wpdb->get_results("
@@ -800,22 +824,41 @@ jQuery(document).ready(function($) {
     };
     
     function loadCustomerPolicies(customerId) {
+        console.log('🔍 Müşteri poliçeleri yükleniyor - ID:', customerId);
+        
+        // customers-view.php'deki yapıyı kullanarak doğrudan veritabanından çek
         $.ajax({
-            url: ajaxurl,
+            url: window.location.href,
             type: 'POST',
             data: {
-                action: 'get_customer_policies_for_tasks',
+                action: 'get_customer_policies_task_form',
                 customer_id: customerId,
-                nonce: '<?php echo wp_create_nonce("get_policies_nonce"); ?>'
+                nonce: '<?php echo wp_create_nonce("get_policies_task_nonce"); ?>'
             },
             success: function(response) {
-                if (response.success && response.data) {
-                    displayCustomerPolicies(response.data);
-                } else {
-                    $('#customerPolicies').html('<p>Bu müşteriye ait aktif poliçe bulunamadı.</p>');
+                console.log('📋 Poliçe verisi alındı:', response);
+                try {
+                    let data;
+                    if (typeof response === 'string') {
+                        data = JSON.parse(response);
+                    } else {
+                        data = response;
+                    }
+                    
+                    if (data.success && data.policies) {
+                        displayCustomerPolicies(data.policies);
+                        console.log('✅ Poliçeler başarıyla yüklendi:', data.policies.length + ' adet');
+                    } else {
+                        $('#customerPolicies').html('<p>Bu müşteriye ait aktif poliçe bulunamadı.</p>');
+                        console.log('ℹ️ Müşteriye ait poliçe bulunamadı');
+                    }
+                } catch (e) {
+                    console.error('❌ JSON parse hatası:', e);
+                    $('#customerPolicies').html('<p>Poliçeler yüklenirken veri hatası oluştu.</p>');
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.error('❌ AJAX hatası:', status, error);
                 $('#customerPolicies').html('<p>Poliçeler yüklenirken hata oluştu.</p>');
             }
         });
@@ -823,16 +866,22 @@ jQuery(document).ready(function($) {
     
     function displayCustomerPolicies(policies) {
         let html = '';
+        console.log('🖼️ Poliçe listesi oluşturuluyor:', policies);
+        
         if (policies.length > 0) {
             policies.forEach(function(policy) {
+                console.log('📄 Poliçe işleniyor:', policy);
+                const endDate = policy.end_date ? new Date(policy.end_date).toLocaleDateString('tr-TR') : 'Belirtilmemiş';
                 html += `<div class="policy-item" data-policy-id="${policy.id}">
-                            <strong>${policy.policy_number}</strong> - ${policy.policy_type}<br>
-                            <small>Şirket: ${policy.insurance_company} | Durum: ${policy.status} | 
-                            Başlangıç: ${policy.start_date}</small>
+                            <strong>${policy.policy_number || 'Poliçe No Belirtilmemiş'}</strong> - ${policy.policy_type || 'Tip Belirtilmemiş'}<br>
+                            <small>Şirket: ${policy.insurance_company || 'Belirtilmemiş'} | Durum: ${policy.status || 'Belirtilmemiş'} | 
+                            Bitiş: ${endDate}</small>
                          </div>`;
             });
+            console.log('✅ HTML oluşturuldu, toplam poliçe:', policies.length);
         } else {
             html = '<p class="no-policies">Bu müşteriye ait aktif poliçe bulunamadı.</p>';
+            console.log('ℹ️ Poliçe bulunamadı mesajı gösteriliyor');
         }
         
         $('#customerPolicies').html(html);
