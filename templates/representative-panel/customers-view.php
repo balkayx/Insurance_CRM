@@ -181,17 +181,33 @@ if (isset($_POST['action']) && $_POST['action'] === 'create_reminder_task' && is
     exit;
 }
 
-// Teklif durumu güncelleme işlemi
+// AJAX Teklif durumu güncelleme işlemi
 if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && isset($_POST['customer_id'])) {
     if (!wp_verify_nonce($_POST['quote_nonce'], 'update_customer_quote')) {
         wp_die('Security check failed');
     }
     
     $customer_id = intval($_POST['customer_id']);
+    $is_ajax = isset($_POST['ajax']);
     
     // Debug logging
     error_log("Quote update - POST customer_id: " . $_POST['customer_id']);
     error_log("Quote update - Processed customer_id: " . $customer_id);
+    error_log("Quote update - Is AJAX: " . ($is_ajax ? 'Yes' : 'No'));
+    
+    // Validate customer ID
+    if (empty($customer_id) || $customer_id <= 0) {
+        if ($is_ajax) {
+            header('Content-Type: application/json');
+            echo json_encode(array('success' => false, 'data' => 'Geçersiz müşteri ID'));
+            exit;
+        } else {
+            $_SESSION['crm_notice'] = '<div class="ab-notice ab-error">Geçersiz müşteri ID.</div>';
+            echo '<script>window.location.href = "?view=customers";</script>';
+            exit;
+        }
+    }
+    
     $quote_data = array(
         'has_offer' => 1,
         'offer_insurance_type' => sanitize_text_field($_POST['offer_insurance_type']),
@@ -212,14 +228,26 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && iss
             create_offer_reminder_task($customer_id, $quote_data);
         }
         
-        $_SESSION['crm_notice'] = '<div class="ab-notice ab-success">Teklif bilgileri başarıyla güncellendi.</div>';
+        if ($is_ajax) {
+            header('Content-Type: application/json');
+            echo json_encode(array('success' => true, 'data' => 'Teklif bilgileri başarıyla güncellendi.'));
+            exit;
+        } else {
+            $_SESSION['crm_notice'] = '<div class="ab-notice ab-success">Teklif bilgileri başarıyla güncellendi.</div>';
+            echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
+            exit;
+        }
     } else {
-        $_SESSION['crm_notice'] = '<div class="ab-notice ab-error">Teklif bilgileri güncellenirken hata oluştu.</div>';
+        if ($is_ajax) {
+            header('Content-Type: application/json');
+            echo json_encode(array('success' => false, 'data' => 'Teklif bilgileri güncellenirken hata oluştu.'));
+            exit;
+        } else {
+            $_SESSION['crm_notice'] = '<div class="ab-notice ab-error">Teklif bilgileri güncellenirken hata oluştu.</div>';
+            echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
+            exit;
+        }
     }
-    
-    // Sayfayı yenile
-    echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
-    exit;
 }
 
 $customer_id = intval($_GET['id']);
@@ -3898,6 +3926,93 @@ jQuery(document).ready(function($) {
             form.submit();
         }
     };
+    
+    // AJAX Quote Form Handler
+    $('#quote-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        var $form = $(this);
+        var $submitBtn = $form.find('button[type="submit"]');
+        var originalBtnText = $submitBtn.html();
+        
+        // Show loading state
+        $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...');
+        
+        // Add AJAX indicator
+        var formData = new FormData(this);
+        formData.append('ajax', '1');
+        
+        $.ajax({
+            url: window.location.href,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                try {
+                    // Try to parse as JSON first (for AJAX responses)
+                    if (typeof response === 'string' && response.trim().startsWith('{')) {
+                        var data = JSON.parse(response);
+                        if (data.success) {
+                            showQuoteMessage('Teklif bilgileri başarıyla kaydedildi!', 'success');
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            showQuoteMessage('Hata: ' + (data.data || 'Bilinmeyen hata'), 'error');
+                        }
+                    } else {
+                        // For non-JSON responses, assume success if no error messages
+                        if (response.indexOf('ab-error') === -1) {
+                            showQuoteMessage('Teklif bilgileri başarıyla kaydedildi!', 'success');
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            showQuoteMessage('Teklif kaydedilirken hata oluştu.', 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Response parsing error:', error);
+                    showQuoteMessage('Teklif bilgileri başarıyla kaydedildi!', 'success');
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1500);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                showQuoteMessage('Bağlantı hatası: ' + error, 'error');
+            },
+            complete: function() {
+                // Restore button state
+                $submitBtn.prop('disabled', false).html(originalBtnText);
+            }
+        });
+    });
+    
+    function showQuoteMessage(message, type) {
+        // Remove any existing messages
+        $('.quote-message').remove();
+        
+        // Create message element
+        var messageClass = type === 'success' ? 'ab-notice ab-success' : 'ab-notice ab-error';
+        var messageHtml = '<div class="quote-message ' + messageClass + '" style="margin: 15px 0; padding: 12px; border-radius: 6px;">' + 
+                         '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-triangle') + '"></i> ' + 
+                         message + '</div>';
+        
+        // Insert message after form header
+        $('.quote-form-header').after(messageHtml);
+        
+        // Auto-remove error messages after 5 seconds
+        if (type === 'error') {
+            setTimeout(function() {
+                $('.quote-message').fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }, 5000);
+        }
+    }
 });
 </script>
 
