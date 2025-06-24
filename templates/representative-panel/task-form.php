@@ -291,6 +291,102 @@ error_log("Task form - Found " . count($users) . " assignable users");
         margin: 10px 0;
     }
 
+    .selected-customer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .clear-selection-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 8px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.3s ease;
+    }
+
+    .clear-selection-btn:hover {
+        background: #c82333;
+    }
+
+    .priority-section {
+        border: 2px solid <?php echo $corporate_color; ?>;
+        border-radius: 8px;
+        background: <?php echo adjust_color_opacity($corporate_color, 0.05); ?>;
+    }
+
+    .section-description {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 15px;
+        font-style: italic;
+    }
+
+    .policies-section {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #ddd;
+    }
+
+    .policies-section h4 {
+        color: <?php echo $corporate_color; ?>;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .policy-hint {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 10px;
+    }
+
+    .continue-without-policy {
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .policy-item {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .policy-item:hover {
+        background: #e9ecef;
+        border-color: <?php echo $corporate_color; ?>;
+    }
+
+    .policy-item.selected {
+        background: <?php echo adjust_color_opacity($corporate_color, 0.1); ?>;
+        border-color: <?php echo $corporate_color; ?>;
+        color: <?php echo $corporate_color; ?>;
+    }
+
+    .task-details-section {
+        opacity: 0.5;
+        pointer-events: none;
+        transition: all 0.3s ease;
+    }
+
+    .task-details-section.enabled {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
     .selected-customer-name {
         font-weight: 600;
         color: <?php echo $corporate_color; ?>;
@@ -421,9 +517,46 @@ error_log("Task form - Found " . count($users) . " assignable users");
         <input type="hidden" name="customer_id" id="selected_customer_id" value="">
         <input type="hidden" name="policy_id" id="selected_policy_id" value="">
 
+        <!-- Müşteri Seçimi -->
+        <div class="ab-form-section priority-section">
+            <h3><i class="fas fa-user-search"></i> 1. Müşteri Seçimi</h3>
+            <div class="section-description">
+                Önce görevi ilişkilendireceğiniz müşteriyi seçin
+            </div>
+            
+            <div class="customer-search-container">
+                <input type="text" id="customerSearch" class="customer-search-input" 
+                       placeholder="Müşteri adı, TC kimlik no, telefon ile arayın..." 
+                       autocomplete="off">
+                <div id="customerSearchResults" class="customer-search-results"></div>
+            </div>
+
+            <div id="selectedCustomerInfo" class="selected-customer" style="display: none;">
+                <div class="selected-customer-header">
+                    <div class="selected-customer-name"></div>
+                    <button type="button" class="clear-selection-btn" onclick="clearCustomerSelection()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="selected-customer-info"></div>
+                <div class="policies-section">
+                    <h4><i class="fas fa-file-contract"></i> İlgili Poliçe Seçin (Opsiyonel):</h4>
+                    <p class="policy-hint">Görev belirli bir poliçe ile ilgiliyse seçin, aksi takdirde boş bırakabilirsiniz.</p>
+                    <div id="customerPolicies"></div>
+                    <label class="continue-without-policy">
+                        <input type="checkbox" id="continueWithoutPolicy"> 
+                        Poliçe seçmeden devam et
+                    </label>
+                </div>
+            </div>
+        </div>
+
         <!-- Görev Bilgileri -->
-        <div class="ab-form-section">
-            <h3><i class="fas fa-info-circle"></i> Görev Bilgileri</h3>
+        <div class="ab-form-section task-details-section" style="display: none;">
+            <h3><i class="fas fa-tasks"></i> 2. Görev Bilgileri</h3>
+            <div class="section-description">
+                Görev detaylarını doldurun
+            </div>
             
             <div class="ab-form-row">
                 <div class="ab-form-group">
@@ -477,29 +610,8 @@ error_log("Task form - Found " . count($users) . " assignable users");
             </div>
         </div>
 
-        <!-- Müşteri Seçimi -->
-        <div class="ab-form-section">
-            <h3><i class="fas fa-user"></i> Müşteri Seçimi</h3>
-            
-            <div class="customer-search-container">
-                <input type="text" id="customerSearch" class="customer-search-input" 
-                       placeholder="Müşteri adı, TC kimlik no, telefon ile arayın..." 
-                       autocomplete="off">
-                <div id="customerSearchResults" class="customer-search-results"></div>
-            </div>
-
-            <div id="selectedCustomerInfo" class="selected-customer" style="display: none;">
-                <div class="selected-customer-name"></div>
-                <div class="selected-customer-info"></div>
-                <div class="policies-list">
-                    <h4>İlgili Poliçe Seçin (Opsiyonel):</h4>
-                    <div id="customerPolicies"></div>
-                </div>
-            </div>
-        </div>
-
         <div class="ab-form-actions">
-            <input type="submit" class="ab-btn ab-btn-primary" value="Görev Ekle">
+            <input type="submit" class="ab-btn ab-btn-primary" value="Görev Ekle" disabled id="submitBtn">
             <a href="?view=tasks" class="ab-btn ab-btn-secondary">İptal</a>
         </div>
     </form>
@@ -534,9 +646,9 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: 'POST',
             data: {
-                action: 'search_customers_for_tasks',
+                action: 'search_customers_for_task',
                 search_term: term,
-                nonce: '<?php echo wp_create_nonce("search_customers_nonce"); ?>'
+                nonce: '<?php echo wp_create_nonce("customer_search"); ?>'
             },
             success: function(response) {
                 console.log('📥 AJAX yanıtı alındı:', response);
@@ -614,9 +726,25 @@ jQuery(document).ready(function($) {
         $('.selected-customer-info').text(`Müşteri Tipi: ${customerType === 'kurumsal' ? 'Kurumsal' : 'Bireysel'}`);
         $('#selectedCustomerInfo').show();
         
+        // Enable task details section
+        $('.task-details-section').show().addClass('enabled');
+        $('#submitBtn').prop('disabled', false);
+        
         // Müşterinin poliçelerini yükle
         loadCustomerPolicies(customerId);
     }
+    
+    // Clear customer selection function
+    window.clearCustomerSelection = function() {
+        selectedCustomer = null;
+        $('#selected_customer_id').val('');
+        $('#selected_policy_id').val('');
+        $('#selectedCustomerInfo').hide();
+        $('#customerSearch').val('');
+        $('.task-details-section').hide().removeClass('enabled');
+        $('#submitBtn').prop('disabled', true);
+        $('#continueWithoutPolicy').prop('checked', false);
+    };
     
     function loadCustomerPolicies(customerId) {
         $.ajax({
@@ -642,12 +770,17 @@ jQuery(document).ready(function($) {
     
     function displayCustomerPolicies(policies) {
         let html = '';
-        policies.forEach(function(policy) {
-            html += `<div class="policy-item" data-policy-id="${policy.id}">
-                        <strong>${policy.policy_number}</strong> - ${policy.policy_type}<br>
-                        <small>Şirket: ${policy.insurance_company} | Durum: ${policy.status}</small>
-                     </div>`;
-        });
+        if (policies.length > 0) {
+            policies.forEach(function(policy) {
+                html += `<div class="policy-item" data-policy-id="${policy.id}">
+                            <strong>${policy.policy_number}</strong> - ${policy.policy_type}<br>
+                            <small>Şirket: ${policy.insurance_company} | Durum: ${policy.status} | 
+                            Başlangıç: ${policy.start_date}</small>
+                         </div>`;
+            });
+        } else {
+            html = '<p class="no-policies">Bu müşteriye ait aktif poliçe bulunamadı.</p>';
+        }
         
         $('#customerPolicies').html(html);
     }
@@ -657,6 +790,19 @@ jQuery(document).ready(function($) {
         $('.policy-item').removeClass('selected');
         $(this).addClass('selected');
         $('#selected_policy_id').val($(this).data('policy-id'));
+        console.log('📋 Seçilen poliçe ID:', $(this).data('policy-id'));
+        
+        // Uncheck continue without policy
+        $('#continueWithoutPolicy').prop('checked', false);
+    });
+    
+    // Continue without policy checkbox
+    $('#continueWithoutPolicy').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('.policy-item').removeClass('selected');
+            $('#selected_policy_id').val('');
+            console.log('✅ Poliçe seçmeden devam et işaretlendi');
+        }
     });
     
     // Form gönderimi kontrolü
@@ -665,10 +811,12 @@ jQuery(document).ready(function($) {
         console.log('Seçili müşteri ID:', $('#selected_customer_id').val());
         console.log('Görev başlığı:', $('#task_title').val());
         console.log('Atanacak kişi:', $('#assigned_to').val());
+        console.log('Poliçe ID:', $('#selected_policy_id').val());
+        console.log('Poliçe seçmeden devam:', $('#continueWithoutPolicy').is(':checked'));
         
         if (!$('#selected_customer_id').val()) {
             e.preventDefault();
-            alert('Lütfen bir müşteri seçin.');
+            alert('Lütfen önce bir müşteri seçin.');
             $('#customerSearch').focus();
             return false;
         }
@@ -687,7 +835,9 @@ jQuery(document).ready(function($) {
             return false;
         }
         
+        // Policy selection is optional - either select a policy or check continue without policy
         console.log('✅ Form validasyonu başarılı, gönderiliyor...');
+        return true;
     });
     
     // Dış tıklamada arama sonuçlarını gizle

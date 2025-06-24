@@ -188,6 +188,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && iss
     }
     
     $customer_id = intval($_POST['customer_id']);
+    
+    // Debug logging
+    error_log("Quote update - POST customer_id: " . $_POST['customer_id']);
+    error_log("Quote update - Processed customer_id: " . $customer_id);
     $quote_data = array(
         'has_offer' => 1,
         'offer_insurance_type' => sanitize_text_field($_POST['offer_insurance_type']),
@@ -394,7 +398,14 @@ $accept_attribute = '.' . implode(',.', $allowed_file_types);
 if (isset($_POST['ajax_upload_files']) && wp_verify_nonce($_POST['file_upload_nonce'], 'file_upload_action')) {
     $response = array('success' => false, 'message' => '', 'files' => array());
     
-    if (handle_customer_file_uploads($customer_id)) {
+    // Ensure file upload function is available
+    if (!function_exists('handle_customer_file_uploads')) {
+        if (file_exists(dirname(__FILE__) . '/customers-form.php')) {
+            require_once(dirname(__FILE__) . '/customers-form.php');
+        }
+    }
+    
+    if (function_exists('handle_customer_file_uploads') && handle_customer_file_uploads($customer_id)) {
         $response['success'] = true;
         $response['message'] = 'Dosyalar başarıyla yüklendi.';
         
@@ -418,7 +429,11 @@ if (isset($_POST['ajax_upload_files']) && wp_verify_nonce($_POST['file_upload_no
             );
         }
     } else {
-        $response['message'] = 'Dosya yüklenirken bir hata oluştu.';
+        if (!function_exists('handle_customer_file_uploads')) {
+            $response['message'] = 'Dosya yükleme fonksiyonu bulunamadı.';
+        } else {
+            $response['message'] = 'Dosya yüklenirken bir hata oluştu.';
+        }
     }
     
     echo json_encode($response);

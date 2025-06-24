@@ -788,17 +788,33 @@ function get_allowed_file_types_text() {
 
 <div class="ab-customer-form-container">
     <!-- Geri dön butonu -->
-    <div class="ab-form-header">
+    <div class="ab-form-header modern-header">
         <div class="ab-header-left">
-            <h2><i class="fas fa-user-edit"></i> <?php echo $editing ? 'Müşteri Düzenle' : 'Yeni Müşteri Ekle'; ?></h2>
+            <div class="header-title-container">
+                <div class="header-icon">
+                    <i class="fas <?php echo $editing ? 'fa-user-edit' : 'fa-user-plus'; ?>"></i>
+                </div>
+                <div class="header-content">
+                    <h1 class="header-title"><?php echo $editing ? 'Müşteri Düzenle' : 'Yeni Müşteri Ekle'; ?></h1>
+                    <div class="header-subtitle">
+                        <?php echo $editing ? 'Müşteri bilgilerini güncelleyin' : 'Sistemde yeni bir müşteri oluşturun'; ?>
+                    </div>
+                </div>
+            </div>
             <div class="ab-breadcrumbs">
-                <a href="?view=customers">Müşteriler</a> <i class="fas fa-chevron-right"></i> 
-                <span><?php echo $editing ? 'Düzenle: ' . esc_html($customer->first_name . ' ' . $customer->last_name) : 'Yeni Müşteri'; ?></span>
+                <a href="?view=customers" class="breadcrumb-link">
+                    <i class="fas fa-users"></i> Müşteriler
+                </a> 
+                <i class="fas fa-chevron-right breadcrumb-separator"></i> 
+                <span class="breadcrumb-current"><?php echo $editing ? 'Düzenle: ' . esc_html($customer->first_name . ' ' . $customer->last_name) : 'Yeni Müşteri'; ?></span>
             </div>
         </div>
-        <a href="?view=customers" class="ab-btn ab-btn-secondary">
-            <i class="fas fa-arrow-left"></i> Listeye Dön
-        </a>
+        <div class="header-actions">
+            <a href="?view=customers" class="ab-btn ab-btn-secondary modern-btn">
+                <i class="fas fa-arrow-left"></i> 
+                <span>Listeye Dön</span>
+            </a>
+        </div>
     </div>
 
     <?php if (isset($message)): ?>
@@ -1574,6 +1590,99 @@ function get_allowed_file_types_text() {
     margin-bottom: 20px;
     padding-bottom: 15px;
     border-bottom: 1px solid #e0e0e0;
+}
+
+/* Modern Header Styles */
+.modern-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 25px 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    border-bottom: none;
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.15);
+}
+
+.header-title-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 10px;
+}
+
+.header-icon {
+    background: rgba(255, 255, 255, 0.2);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    backdrop-filter: blur(10px);
+}
+
+.header-content {
+    flex: 1;
+}
+
+.header-title {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-subtitle {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-top: 5px;
+    font-weight: 400;
+}
+
+.modern-header .ab-breadcrumbs {
+    margin-top: 15px;
+}
+
+.breadcrumb-link {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: 6px;
+}
+
+.breadcrumb-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.breadcrumb-separator {
+    margin: 0 10px;
+    opacity: 0.7;
+}
+
+.breadcrumb-current {
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+.header-actions .modern-btn {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.header-actions .modern-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
 }
 
 .ab-header-left {

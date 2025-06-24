@@ -10,9 +10,9 @@
  * Plugin Name: Insurance CRM
  * Plugin URI: https://github.com/anadolubirlik/insurance-crm
  * Description: Sigorta acenteleri için müşteri, poliçe ve görev yönetim sistemi.
- * Version: 1.5.1
+ * Version: 1.5.2
  * Pagename: insurance-crm.php
- * Page Version: 1.5.1
+ * Page Version: 1.5.2
  * Author: Mehmet BALKAY | Anadolu Birlik
  * Author URI: https://www.balkay.net
  */
@@ -1820,6 +1820,48 @@ function insurance_crm_search_customers_for_task() {
 }
 
 add_action('wp_ajax_search_customers_for_task', 'insurance_crm_search_customers_for_task');
+
+/**
+ * AJAX handler for getting customer policies for task form
+ */
+function insurance_crm_get_customer_policies_for_tasks() {
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'get_policies_nonce')) {
+        wp_send_json_error('Security check failed');
+    }
+    
+    // Check user permissions
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error('Insufficient permissions');
+    }
+    
+    global $wpdb;
+    $policies_table = $wpdb->prefix . 'insurance_crm_policies';
+    
+    $customer_id = intval($_POST['customer_id']);
+    
+    // Check if customer ID is provided
+    if (empty($customer_id)) {
+        wp_send_json_error('Customer ID is required');
+    }
+    
+    // Get active policies for the customer
+    $policies = $wpdb->get_results($wpdb->prepare(
+        "SELECT id, policy_number, policy_type, insurance_company, status, start_date, end_date 
+         FROM {$policies_table} 
+         WHERE customer_id = %d AND status != 'iptal' 
+         ORDER BY created_at DESC",
+        $customer_id
+    ));
+    
+    if ($policies) {
+        wp_send_json_success($policies);
+    } else {
+        wp_send_json_success(array()); // Empty array but still success
+    }
+}
+
+add_action('wp_ajax_get_customer_policies_for_tasks', 'insurance_crm_get_customer_policies_for_tasks');
 
 /**
  * AJAX handler for hierarchy updates
