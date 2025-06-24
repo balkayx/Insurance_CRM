@@ -1,8 +1,8 @@
 <?php
 /**
  * Müşteri Detay Sayfası
- * @version 3.5.0
- * @description Teklif hatırlatma fonksiyonu ve wpdb::prepare hataları düzeltildi
+ * @version 3.6.0
+ * @description Teklif hatırlatma fonksiyonu, wpdb::prepare hataları ve tablo genişlik tutarlılığı düzeltildi
  */
 
 // Yetki kontrolü
@@ -865,7 +865,7 @@ function format_file_size($size) {
     <div id="ajax-response-container"></div>
     
     <!-- Müşteri Bilgileri -->
-    <div class="ab-panels" style="padding: 0 40px;">
+    <div class="ab-panels" style="padding: 0 40px; max-width: 100%; box-sizing: border-box;">
         <div class="ab-panel ab-panel-personal" style="--panel-color: <?php echo esc_attr($personal_color); ?>">
             <div class="ab-panel-header">
                 <h3><i class="fas fa-user-circle"></i> Kişisel Bilgiler</h3>
@@ -1952,6 +1952,8 @@ function format_file_size($size) {
     grid-template-columns: repeat(2, 1fr);
     gap: 24px;
     margin-bottom: 24px;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .ab-panel {
@@ -1962,6 +1964,8 @@ function format_file_size($size) {
     border: 1px solid rgba(0, 0, 0, 0.04);
     transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .ab-panel::before {
@@ -2127,6 +2131,8 @@ function format_file_size($size) {
     grid-template-columns: repeat(2, 1fr);
     gap: 20px;
     margin-bottom: 4px;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .ab-info-item {
@@ -2135,6 +2141,8 @@ function format_file_size($size) {
     padding: 16px;
     border: 1px solid rgba(var(--panel-color-rgb, 52, 152, 219), 0.08);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 0;
+    overflow: hidden;
 }
 
 .ab-info-item:hover {
@@ -2162,6 +2170,9 @@ function format_file_size($size) {
     font-weight: 500;
     color: #1a1a1a;
     line-height: 1.4;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
 }
 
 .ab-info-value a {
@@ -3341,10 +3352,12 @@ tr.overdue td {
     .ab-panels {
         grid-template-columns: 1fr;
         gap: 16px;
+        padding: 0 20px !important;
     }
     
     .ab-panel {
         width: 100%;
+        max-width: 100%;
     }
     
     .ab-customer-header {
