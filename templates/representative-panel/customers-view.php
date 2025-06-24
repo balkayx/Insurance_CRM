@@ -1343,7 +1343,6 @@ function format_file_size($size) {
                         </div>
                     </div>
                     <?php endif; ?>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
