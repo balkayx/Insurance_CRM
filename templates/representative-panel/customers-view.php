@@ -1202,73 +1202,67 @@ function format_file_size($size) {
                     </div>
                     
                     <?php if ($has_offer): ?>
-                    <div class="ab-info-grid" style="grid-template-columns: 1fr 1fr;">
-                        <div class="ab-info-item">
-                            <div class="ab-info-label">Sigorta Tipi</div>
-                            <div class="ab-info-value">
-                                <?php echo !empty($customer->offer_insurance_type) ? esc_html($customer->offer_insurance_type) : '<span class="no-value">Belirtilmemiş</span>'; ?>
-                            </div>
-                        </div>
-                        
-                        <div class="ab-info-item">
-                            <div class="ab-info-label">Teklif Tutarı</div>
-                            <div class="ab-info-value ab-amount">
-                                <?php 
-                                if (!empty($customer->offer_amount)) {
-                                    echo number_format($customer->offer_amount, 2, ',', '.') . ' ₺';
-                                } else {
-                                    echo '<span class="no-value">Belirtilmemiş</span>';
-                                }
-                                ?>
-                            </div>
+                    <div class="ab-info-item">
+                        <div class="ab-info-label">Sigorta Tipi</div>
+                        <div class="ab-info-value">
+                            <?php echo !empty($customer->offer_insurance_type) ? esc_html($customer->offer_insurance_type) : '<span class="no-value">Belirtilmemiş</span>'; ?>
                         </div>
                     </div>
                     
-                        <div class="ab-info-item">
-                            <div class="ab-info-label">Teklif Vadesi</div>
-                            <div class="ab-info-value">
-                                <?php echo !empty($customer->offer_expiry_date) ? date('d.m.Y', strtotime($customer->offer_expiry_date)) : '<span class="no-value">Belirtilmemiş</span>'; ?>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="ab-info-grid" style="grid-template-columns: 1fr 1fr;">
-                    
-                        <div class="ab-info-item">
-                            <div class="ab-info-label">Teklif Dosyası</div>
-                            <div class="ab-info-value ab-offer-file">
+                    <div class="ab-info-item">
+                        <div class="ab-info-label">Teklif Tutarı</div>
+                        <div class="ab-info-value ab-amount">
                             <?php 
-                            // Teklif dosyasını bulmak için dosya arşivini kontrol et
-                            $offer_file = null;
-                            if (!empty($files)) {
-                                foreach ($files as $file) {
-                                    if (strpos(strtolower($file->description), 'teklif') !== false) {
-                                        $offer_file = $file;
-                                        break;
-                                    }
+                            if (!empty($customer->offer_amount)) {
+                                echo number_format($customer->offer_amount, 2, ',', '.') . ' ₺';
+                            } else {
+                                echo '<span class="no-value">Belirtilmemiş</span>';
+                            }
+                            ?>
+                        </div>
+                    </div>
+                    
+                    <div class="ab-info-item">
+                        <div class="ab-info-label">Teklif Vadesi</div>
+                        <div class="ab-info-value">
+                            <?php echo !empty($customer->offer_expiry_date) ? date('d.m.Y', strtotime($customer->offer_expiry_date)) : '<span class="no-value">Belirtilmemiş</span>'; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="ab-info-item">
+                        <div class="ab-info-label">Teklif Dosyası</div>
+                        <div class="ab-info-value ab-offer-file">
+                        <?php 
+                        // Teklif dosyasını bulmak için dosya arşivini kontrol et
+                        $offer_file = null;
+                        if (!empty($files)) {
+                            foreach ($files as $file) {
+                                if (strpos(strtolower($file->description), 'teklif') !== false) {
+                                    $offer_file = $file;
+                                    break;
                                 }
                             }
-                            
-                            if ($offer_file): 
-                            ?>
-                                <a href="<?php echo esc_url($offer_file->file_path); ?>" target="_blank" class="ab-btn ab-btn-sm">
-                                    <i class="fas <?php echo get_file_icon($offer_file->file_type); ?>"></i> 
-                                    <?php echo esc_html($offer_file->file_name); ?>
-                                </a>
-                            <?php else: ?>
-                                <span class="no-value">Dosya yüklenmemiş</span>
-                                <a href="#" class="ab-btn ab-btn-sm open-file-upload-modal">
-                                    <i class="fas fa-upload"></i> Teklif Dosyası Yükle
-                                </a>
-                            <?php endif; ?>
-                            </div>
-                        </div>
+                        }
                         
-                        <div class="ab-info-item">
-                            <div class="ab-info-label">Teklif Notları</div>
-                            <div class="ab-info-value">
-                                <?php echo !empty($customer->offer_notes) ? nl2br(esc_html($customer->offer_notes)) : '<span class="no-value">Not eklenmemiş</span>'; ?>
-                            </div>
+                        if ($offer_file): 
+                        ?>
+                            <a href="<?php echo esc_url($offer_file->file_path); ?>" target="_blank" class="ab-btn ab-btn-sm">
+                                <i class="fas <?php echo get_file_icon($offer_file->file_type); ?>"></i> 
+                                <?php echo esc_html($offer_file->file_name); ?>
+                            </a>
+                        <?php else: ?>
+                            <span class="no-value">Dosya yüklenmemiş</span>
+                            <a href="#" class="ab-btn ab-btn-sm open-file-upload-modal">
+                                <i class="fas fa-upload"></i> Teklif Dosyası Yükle
+                            </a>
+                        <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="ab-info-item">
+                        <div class="ab-info-label">Teklif Notları</div>
+                        <div class="ab-info-value">
+                            <?php echo !empty($customer->offer_notes) ? nl2br(esc_html($customer->offer_notes)) : '<span class="no-value">Not eklenmemiş</span>'; ?>
                         </div>
                     </div>
                     

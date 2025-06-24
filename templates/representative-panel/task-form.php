@@ -159,8 +159,17 @@ if (empty($customers)) {
     ");
 }
 
+// Tüm poliçeleri çek - JavaScript değişkenine aktarmak için
+$all_policies = $wpdb->get_results("
+    SELECT id, customer_id, policy_number, policy_type, insurance_company, status, end_date
+    FROM {$wpdb->prefix}insurance_crm_policies 
+    WHERE status != 'iptal'
+    ORDER BY customer_id, end_date ASC
+");
+
 error_log("Task form - Found " . count($users) . " assignable users");
 error_log("Task form - Found " . count($customers) . " customers");
+error_log("Task form - Found " . count($all_policies) . " policies");
 ?>
 
 <style>
@@ -330,25 +339,36 @@ error_log("Task form - Found " . count($customers) . " customers");
         cursor: pointer;
     }
 
-    .policy-item {
+    .policy-radio-item {
         background: #f8f9fa;
         border: 1px solid #dee2e6;
         border-radius: 4px;
-        padding: 10px;
         margin-bottom: 8px;
-        cursor: pointer;
         transition: all 0.3s ease;
     }
 
-    .policy-item:hover {
+    .policy-radio-item:hover {
         background: #e9ecef;
         border-color: <?php echo $corporate_color; ?>;
     }
 
-    .policy-item.selected {
+    .policy-radio {
+        margin: 0;
+        margin-right: 8px;
+    }
+
+    .policy-label {
+        display: block;
+        padding: 10px;
+        cursor: pointer;
+        margin: 0;
+        font-weight: normal;
+    }
+
+    .policy-radio:checked + .policy-label {
         background: <?php echo adjust_color_opacity($corporate_color, 0.1); ?>;
-        border-color: <?php echo $corporate_color; ?>;
         color: <?php echo $corporate_color; ?>;
+        border-radius: 4px;
     }
 
     .task-details-section {
@@ -376,26 +396,6 @@ error_log("Task form - Found " . count($customers) . " customers");
 
     .policies-list {
         margin-top: 15px;
-    }
-
-    .policy-item {
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 10px;
-        margin-bottom: 8px;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .policy-item:hover {
-        border-color: <?php echo $corporate_color; ?>;
-        background: <?php echo adjust_color_opacity($corporate_color, 0.05); ?>;
-    }
-
-    .policy-item.selected {
-        border-color: <?php echo $corporate_color; ?>;
-        background: <?php echo adjust_color_opacity($corporate_color, 0.1); ?>;
     }
 
     .ab-form-actions {
@@ -595,9 +595,9 @@ error_log("Task form - Found " . count($customers) . " customers");
                 </div>
                 
                 <div class="ab-form-group">
-                    <label for="due_date">Teslim Tarihi</label>
-                    <input type="date" id="due_date" name="due_date" class="ab-input" 
-                           min="<?php echo date('Y-m-d'); ?>">
+                    <label for="due_date">Görev Son Tarihi</label>
+                    <input type="datetime-local" id="due_date" name="due_date" class="ab-input" 
+                           min="<?php echo date('Y-m-d\TH:i'); ?>">
                 </div>
             </div>
 
@@ -619,6 +619,10 @@ error_log("Task form - Found " . count($customers) . " customers");
 
 <script>
 const ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+
+// Tüm poliçe verilerini JavaScript değişkenine aktar
+const allPolicies = <?php echo json_encode($all_policies); ?>;
+
 jQuery(document).ready(function($) {
     let selectedCustomer = null;
     
@@ -797,51 +801,21 @@ jQuery(document).ready(function($) {
         $('#selected_customer_id').val('');
         $('#selected_policy_id').val('');
         $('#selectedCustomerInfo').hide();
-        $('#customerSearch').val('');
+        $('#customer_select').val('');
         $('.task-details-section').hide().removeClass('enabled');
         $('#submitBtn').prop('disabled', true);
         $('#continueWithoutPolicy').prop('checked', false);
+        $('.policy-radio').prop('checked', false);
     };
     
     function loadCustomerPolicies(customerId) {
         console.log('🔍 Müşteri poliçeleri yükleniyor - ID:', customerId);
         
-        // customers-view.php'deki yapıyı kullanarak doğrudan veritabanından çek
-        $.ajax({
-            url: window.location.href,
-            type: 'POST',
-            data: {
-                action: 'get_customer_policies_task_form',
-                customer_id: customerId,
-                nonce: '<?php echo wp_create_nonce("get_policies_task_nonce"); ?>'
-            },
-            success: function(response) {
-                console.log('📋 Poliçe verisi alındı:', response);
-                try {
-                    let data;
-                    if (typeof response === 'string') {
-                        data = JSON.parse(response);
-                    } else {
-                        data = response;
-                    }
-                    
-                    if (data.success && data.policies) {
-                        displayCustomerPolicies(data.policies);
-                        console.log('✅ Poliçeler başarıyla yüklendi:', data.policies.length + ' adet');
-                    } else {
-                        $('#customerPolicies').html('<p>Bu müşteriye ait aktif poliçe bulunamadı.</p>');
-                        console.log('ℹ️ Müşteriye ait poliçe bulunamadı');
-                    }
-                } catch (e) {
-                    console.error('❌ JSON parse hatası:', e);
-                    $('#customerPolicies').html('<p>Poliçeler yüklenirken veri hatası oluştu.</p>');
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('❌ AJAX hatası:', status, error);
-                $('#customerPolicies').html('<p>Poliçeler yüklenirken hata oluştu.</p>');
-            }
-        });
+        // Tüm poliçeler arasından ilgili müşterinin poliçelerini filtrele
+        const customerPolicies = allPolicies.filter(policy => policy.customer_id == customerId);
+        
+        console.log('📋 Bulunan poliçe sayısı:', customerPolicies.length);
+        displayCustomerPolicies(customerPolicies);
     }
     
     function displayCustomerPolicies(policies) {
@@ -849,13 +823,18 @@ jQuery(document).ready(function($) {
         console.log('🖼️ Poliçe listesi oluşturuluyor:', policies);
         
         if (policies.length > 0) {
-            policies.forEach(function(policy) {
+            policies.forEach(function(policy, index) {
                 console.log('📄 Poliçe işleniyor:', policy);
                 const endDate = policy.end_date ? new Date(policy.end_date).toLocaleDateString('tr-TR') : 'Belirtilmemiş';
-                html += `<div class="policy-item" data-policy-id="${policy.id}">
-                            <strong>${policy.policy_number || 'Poliçe No Belirtilmemiş'}</strong> - ${policy.policy_type || 'Tip Belirtilmemiş'}<br>
-                            <small>Şirket: ${policy.insurance_company || 'Belirtilmemiş'} | Durum: ${policy.status || 'Belirtilmemiş'} | 
-                            Bitiş: ${endDate}</small>
+                const radioId = 'policy_' + policy.id;
+                
+                html += `<div class="policy-radio-item">
+                            <input type="radio" id="${radioId}" name="policy_selection" value="${policy.id}" class="policy-radio">
+                            <label for="${radioId}" class="policy-label">
+                                <strong>${policy.policy_number || 'Poliçe No Belirtilmemiş'}</strong> - ${policy.policy_type || 'Tip Belirtilmemiş'}<br>
+                                <small>Şirket: ${policy.insurance_company || 'Belirtilmemiş'} | Durum: ${policy.status || 'Belirtilmemiş'} | 
+                                Bitiş: ${endDate}</small>
+                            </label>
                          </div>`;
             });
             console.log('✅ HTML oluşturuldu, toplam poliçe:', policies.length);
@@ -867,12 +846,11 @@ jQuery(document).ready(function($) {
         $('#customerPolicies').html(html);
     }
     
-    // Poliçe seçimi
-    $(document).on('click', '.policy-item', function() {
-        $('.policy-item').removeClass('selected');
-        $(this).addClass('selected');
-        $('#selected_policy_id').val($(this).data('policy-id'));
-        console.log('📋 Seçilen poliçe ID:', $(this).data('policy-id'));
+    // Poliçe seçimi - radio button değişikliği
+    $(document).on('change', '.policy-radio', function() {
+        const selectedPolicyId = $(this).val();
+        $('#selected_policy_id').val(selectedPolicyId);
+        console.log('📋 Seçilen poliçe ID:', selectedPolicyId);
         
         // Uncheck continue without policy
         $('#continueWithoutPolicy').prop('checked', false);
@@ -881,7 +859,7 @@ jQuery(document).ready(function($) {
     // Continue without policy checkbox
     $('#continueWithoutPolicy').on('change', function() {
         if ($(this).is(':checked')) {
-            $('.policy-item').removeClass('selected');
+            $('.policy-radio').prop('checked', false);
             $('#selected_policy_id').val('');
             console.log('✅ Poliçe seçmeden devam et işaretlendi');
         }
@@ -899,7 +877,7 @@ jQuery(document).ready(function($) {
         if (!$('#selected_customer_id').val()) {
             e.preventDefault();
             alert('Lütfen önce bir müşteri seçin.');
-            $('#customerSearch').focus();
+            $('#customer_select').focus();
             return false;
         }
         
@@ -932,31 +910,8 @@ jQuery(document).ready(function($) {
 </script>
 
 <?php
-// AJAX handlers
+// AJAX handlers - Keep only the ones we still need
 add_action('wp_ajax_search_customers_for_tasks', 'handle_search_customers_for_tasks');
-add_action('wp_ajax_get_customer_policies_for_tasks', 'handle_get_customer_policies_for_tasks');
-add_action('wp_ajax_get_customer_policies_task_form', 'handle_get_customer_policies_task_form');
-
-function handle_get_customer_policies_task_form() {
-    if (!wp_verify_nonce($_POST['nonce'], 'get_policies_task_nonce')) {
-        wp_send_json_error('Güvenlik kontrolü başarısız');
-        return;
-    }
-    
-    global $wpdb;
-    $customer_id = intval($_POST['customer_id']);
-    
-    $policies_table = $wpdb->prefix . 'insurance_crm_policies';
-    $policies = $wpdb->get_results($wpdb->prepare("
-        SELECT * FROM $policies_table 
-        WHERE customer_id = %d
-        ORDER BY end_date ASC
-    ", $customer_id));
-    
-    wp_send_json_success([
-        'policies' => $policies ?: []
-    ]);
-}
 
 function handle_search_customers_for_tasks() {
     if (!wp_verify_nonce($_POST['nonce'], 'search_customers_nonce')) {
@@ -993,30 +948,6 @@ function handle_search_customers_for_tasks() {
         wp_send_json_success($customers);
     } else {
         wp_send_json_error('Müşteri bulunamadı');
-    }
-}
-
-function handle_get_customer_policies_for_tasks() {
-    if (!wp_verify_nonce($_POST['nonce'], 'get_policies_nonce')) {
-        wp_die('Security check failed');
-    }
-    
-    global $wpdb;
-    $customer_id = intval($_POST['customer_id']);
-    $policies_table = $wpdb->prefix . 'insurance_crm_policies';
-    
-    $policies = $wpdb->get_results($wpdb->prepare("
-        SELECT id, policy_number, policy_type, insurance_company, status
-        FROM $policies_table 
-        WHERE customer_id = %d AND status != 'iptal'
-        ORDER BY created_at DESC
-        LIMIT 10
-    ", $customer_id), ARRAY_A);
-    
-    if ($policies) {
-        wp_send_json_success($policies);
-    } else {
-        wp_send_json_error('Poliçe bulunamadı');
     }
 }
 ?>
