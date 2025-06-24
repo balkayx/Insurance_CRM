@@ -48,7 +48,7 @@ $columns_to_check = [
     'customer_id' => "ALTER TABLE $tasks_table ADD COLUMN customer_id INT(11) AFTER task_title",
     'policy_id' => "ALTER TABLE $tasks_table ADD COLUMN policy_id INT(11) DEFAULT NULL AFTER customer_id",
     'priority' => "ALTER TABLE $tasks_table ADD COLUMN priority VARCHAR(20) DEFAULT 'normal' AFTER status",
-    'due_date' => "ALTER TABLE $tasks_table ADD COLUMN due_date DATE DEFAULT NULL AFTER priority"
+    'due_date' => "ALTER TABLE $tasks_table ADD COLUMN due_date DATETIME DEFAULT NULL AFTER priority"
 ];
 
 foreach ($columns_to_check as $column => $sql) {
@@ -56,6 +56,13 @@ foreach ($columns_to_check as $column => $sql) {
     if (!$column_exists) {
         $wpdb->query($sql);
     }
+}
+
+// Existing due_date column type migration - change from DATE to DATETIME if needed
+$due_date_column_info = $wpdb->get_row("SHOW COLUMNS FROM $tasks_table LIKE 'due_date'");
+if ($due_date_column_info && strtolower($due_date_column_info->Type) === 'date') {
+    error_log("Migrating due_date column from DATE to DATETIME");
+    $wpdb->query("ALTER TABLE $tasks_table MODIFY COLUMN due_date DATETIME DEFAULT NULL");
 }
 
 // Form verilerini işle
