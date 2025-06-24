@@ -10,9 +10,9 @@
  * Plugin Name: Insurance CRM
  * Plugin URI: https://github.com/anadolubirlik/insurance-crm
  * Description: Sigorta acenteleri için müşteri, poliçe ve görev yönetim sistemi.
- * Version: 1.5.4
+ * Version: 1.5.5
  * Pagename: insurance-crm.php
- * Page Version: 1.5.4
+ * Page Version: 1.5.5
  * Author: Mehmet BALKAY | Anadolu Birlik
  * Author URI: https://www.balkay.net
  */
@@ -1554,7 +1554,7 @@ function insurance_crm_fix_all_names() {
     
     // Get representative info and check role
     global $wpdb;
-    $reps_table = $wpdb->prefix . 'insurance_crm_reps';
+    $reps_table = $wpdb->prefix . 'insurance_crm_representatives';
     $current_rep = $wpdb->get_row($wpdb->prepare(
         "SELECT role FROM $reps_table WHERE user_id = %d", 
         $current_user->ID
@@ -1778,7 +1778,11 @@ function insurance_crm_search_customers_for_task() {
     
     // Build search query
     $search_query = "
-        SELECT id, first_name, last_name, tc_identity, tax_number, phone, company_name
+        SELECT id, first_name, last_name, tc_identity, tax_number, phone, company_name,
+               CASE 
+                   WHEN company_name IS NOT NULL AND company_name != '' THEN 'kurumsal'
+                   ELSE 'bireysel'
+               END as customer_type
         FROM $customers_table 
         WHERE (
             CONCAT(first_name, ' ', last_name) LIKE %s

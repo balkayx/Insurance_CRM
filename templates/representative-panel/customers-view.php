@@ -3997,15 +3997,16 @@ jQuery(document).ready(function($) {
 </style>
 
 <style>
-/* Modern Quote Form Styles */
+/* Enhanced Corporate Quote Form Styles */
 .modern-quote-form {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 16px;
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 50%, #2980b9 100%);
+    border-radius: 20px;
     padding: 0;
     margin-bottom: 30px;
-    box-shadow: 0 20px 40px rgba(102, 126, 234, 0.15);
+    box-shadow: 0 25px 60px rgba(44, 62, 80, 0.2), 0 15px 40px rgba(52, 152, 219, 0.1);
     overflow: hidden;
     position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .modern-quote-form::before {
@@ -4015,54 +4016,85 @@ jQuery(document).ready(function($) {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    background: 
+        radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at bottom right, rgba(52, 152, 219, 0.1) 0%, transparent 50%);
     pointer-events: none;
 }
 
 .quote-form-header {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 24px 30px;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 32px 40px;
     display: flex;
     align-items: center;
-    gap: 20px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    backdrop-filter: blur(10px);
+    gap: 24px;
+    border-bottom: 2px solid rgba(52, 152, 219, 0.1);
+    backdrop-filter: blur(15px);
+    position: relative;
+}
+
+.quote-form-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 40px;
+    right: 40px;
+    height: 2px;
+    background: linear-gradient(90deg, #3498db 0%, #2980b9 100%);
 }
 
 .quote-form-icon {
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 16px;
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    border-radius: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 24px;
-    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    font-size: 28px;
+    box-shadow: 
+        0 10px 30px rgba(52, 152, 219, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    position: relative;
+}
+
+.quote-form-icon::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+    border-radius: 18px;
+    pointer-events: none;
 }
 
 .quote-form-title h4 {
-    margin: 0 0 5px 0;
-    font-size: 20px;
-    font-weight: 600;
-    color: #2d3748;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    margin: 0 0 8px 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #2c3e50;
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    letter-spacing: -0.5px;
 }
 
 .quote-form-title p {
     margin: 0;
-    color: #718096;
-    font-size: 14px;
-    line-height: 1.4;
+    color: #7f8c8d;
+    font-size: 15px;
+    line-height: 1.5;
+    font-weight: 500;
 }
 
 .modern-form-container {
-    background: white;
-    padding: 30px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    padding: 40px;
+    position: relative;
 }
 
 .form-grid {
@@ -4083,99 +4115,144 @@ jQuery(document).ready(function($) {
 .modern-label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    font-weight: 600;
-    font-size: 14px;
-    color: #4a5568;
+    gap: 10px;
+    margin-bottom: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    color: #2c3e50;
+    letter-spacing: 0.3px;
 }
 
 .modern-label i {
-    color: #667eea;
-    width: 16px;
+    color: #3498db;
+    width: 18px;
     text-align: center;
+    font-size: 16px;
 }
 
 .modern-input {
     width: 100%;
-    padding: 14px 18px;
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    font-size: 15px;
-    background: #fafafa;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 16px 20px;
+    border: 2px solid #ecf0f1;
+    border-radius: 15px;
+    font-size: 16px;
+    background: #ffffff;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     box-sizing: border-box;
+    font-weight: 500;
+    color: #2c3e50;
 }
 
 .modern-input:focus {
     outline: none;
-    border-color: #667eea;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    transform: translateY(-1px);
+    border-color: #3498db;
+    background: #ffffff;
+    box-shadow: 
+        0 0 0 4px rgba(52, 152, 219, 0.1),
+        0 8px 25px rgba(52, 152, 219, 0.15);
+    transform: translateY(-2px);
 }
 
 .modern-input:hover {
-    border-color: #cbd5e0;
-    background: white;
+    border-color: #bdc3c7;
+    background: #ffffff;
+    transform: translateY(-1px);
 }
 
 .modern-select {
     cursor: pointer;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 12px center;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233498db' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 16px center;
     background-repeat: no-repeat;
-    background-size: 16px;
-    padding-right: 40px;
+    background-size: 18px;
+    padding-right: 48px;
 }
 
 .modern-textarea {
     resize: vertical;
-    min-height: 100px;
+    min-height: 120px;
     font-family: inherit;
-    line-height: 1.5;
+    line-height: 1.6;
 }
 
 .form-actions {
     display: flex;
-    gap: 16px;
+    gap: 20px;
     justify-content: flex-end;
-    padding-top: 24px;
-    border-top: 1px solid #f1f5f9;
-    margin-top: 30px;
+    padding-top: 32px;
+    border-top: 2px solid #ecf0f1;
+    margin-top: 40px;
+    position: relative;
+}
+
+.form-actions::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #3498db 0%, #2980b9 100%);
+    opacity: 0.3;
 }
 
 .btn-large {
-    padding: 16px 32px;
-    font-size: 15px;
-    font-weight: 600;
-    border-radius: 10px;
+    padding: 18px 36px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 12px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     border: none;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     text-decoration: none;
-    min-width: 160px;
+    min-width: 180px;
     justify-content: center;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-large::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-large:hover::before {
+    left: 100%;
 }
 
 .btn-primary.btn-large {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
     color: white;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    box-shadow: 
+        0 8px 25px rgba(52, 152, 219, 0.3),
+        0 4px 15px rgba(41, 128, 185, 0.2);
 }
 
 .btn-primary.btn-large:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    transform: translateY(-3px);
+    box-shadow: 
+        0 12px 35px rgba(52, 152, 219, 0.4),
+        0 8px 20px rgba(41, 128, 185, 0.3);
+    background: linear-gradient(135deg, #2980b9 0%, #3498db 100%);
 }
 
 .btn-secondary.btn-large {
-    background: #f8f9fa;
-    color: #495057;
-    border: 2px solid #e9ecef;
+    background: linear-gradient(135deg, #ecf0f1 0%, #bdc3c7 100%);
+    color: #2c3e50;
+    border: 2px solid #bdc3c7;
+    box-shadow: 0 4px 15px rgba(189, 195, 199, 0.3);
+}
 }
 
 .btn-secondary.btn-large:hover {
