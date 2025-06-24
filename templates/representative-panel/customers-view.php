@@ -693,14 +693,9 @@ function format_file_size($size) {
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <div class="ab-customer-details">
-
-    <!-- Geri dön butonu -->
-    <a href="?view=customers" class="ab-back-button">
-        <i class="fas fa-arrow-left"></i> Müşterilere Dön
-    </a>
     
     <!-- Müşteri Başlık Bilgisi -->
-    <div class="ab-customer-header">
+    <div class="ab-customer-header" style="padding: 0 20px;">
         <div class="ab-customer-title">
             <h1><i class="fas fa-user"></i> <?php echo esc_html($customer->first_name . ' ' . $customer->last_name); ?></h1>
             <div class="ab-customer-meta">
@@ -754,7 +749,7 @@ function format_file_size($size) {
     <div id="ajax-response-container"></div>
     
     <!-- Müşteri Bilgileri -->
-    <div class="ab-panels">
+    <div class="ab-panels" style="padding: 0 20px;">
         <div class="ab-panel ab-panel-personal" style="--panel-color: <?php echo esc_attr($personal_color); ?>">
             <div class="ab-panel-header">
                 <h3><i class="fas fa-user-circle"></i> Kişisel Bilgiler</h3>
@@ -1097,56 +1092,54 @@ function format_file_size($size) {
         <div class="ab-panel ab-panel-offer" style="--panel-color: <?php echo esc_attr($offer_color); ?>">
             <div class="ab-panel-header">
                 <h3><i class="fas fa-file-invoice-dollar"></i> Teklif Verildi mi?</h3>
-                <?php if (!isset($customer->has_offer) || $customer->has_offer != 1): ?>
                 <div class="ab-panel-actions">
                     <button type="button" class="ab-btn ab-btn-sm ab-btn-primary" id="toggle-offer-form">
-                        <i class="fas fa-plus"></i> Teklif Ver
+                        <i class="fas fa-plus"></i> <?php echo (isset($customer->has_offer) && $customer->has_offer == 1) ? 'Teklif Düzenle' : 'Teklif Ver'; ?>
                     </button>
                 </div>
-                <?php endif; ?>
             </div>
             <div class="ab-panel-body">
                 
                 <!-- Teklif Ekleme Formu -->
-                <?php if (!isset($customer->has_offer) || $customer->has_offer != 1): ?>
                 <div class="ab-offer-form" id="offer-form" style="display:none;">
-                    <form id="offer-form-data">
+                    <form method="post" action="">
                         <?php wp_nonce_field('update_customer_offer', 'offer_nonce'); ?>
                         <input type="hidden" name="customer_id" value="<?php echo $customer_id; ?>">
                         <input type="hidden" name="action" value="update_offer">
+                        <input type="hidden" name="has_offer" value="1">
                         
                         <div class="ab-form-row">
                             <div class="ab-form-group">
                                 <label for="offer_insurance_type">Sigorta Türü *</label>
                                 <select name="offer_insurance_type" id="offer_insurance_type" required>
                                     <option value="">Seçiniz</option>
-                                    <option value="Kasko">Kasko</option>
-                                    <option value="Trafik">Trafik</option>
-                                    <option value="Dask">Dask</option>
-                                    <option value="Konut">Konut</option>
-                                    <option value="İşyeri">İşyeri</option>
-                                    <option value="Sağlık">Sağlık</option>
-                                    <option value="Hayat">Hayat</option>
-                                    <option value="Seyahat">Seyahat</option>
-                                    <option value="Diğer">Diğer</option>
+                                    <option value="Kasko" <?php echo (isset($customer->offer_insurance_type) && $customer->offer_insurance_type == 'Kasko') ? 'selected' : ''; ?>>Kasko</option>
+                                    <option value="Trafik" <?php echo (isset($customer->offer_insurance_type) && $customer->offer_insurance_type == 'Trafik') ? 'selected' : ''; ?>>Trafik</option>
+                                    <option value="Dask" <?php echo (isset($customer->offer_insurance_type) && $customer->offer_insurance_type == 'Dask') ? 'selected' : ''; ?>>Dask</option>
+                                    <option value="Konut" <?php echo (isset($customer->offer_insurance_type) && $customer->offer_insurance_type == 'Konut') ? 'selected' : ''; ?>>Konut</option>
+                                    <option value="İşyeri" <?php echo (isset($customer->offer_insurance_type) && $customer->offer_insurance_type == 'İşyeri') ? 'selected' : ''; ?>>İşyeri</option>
+                                    <option value="Sağlık" <?php echo (isset($customer->offer_insurance_type) && $customer->offer_insurance_type == 'Sağlık') ? 'selected' : ''; ?>>Sağlık</option>
+                                    <option value="Hayat" <?php echo (isset($customer->offer_insurance_type) && $customer->offer_insurance_type == 'Hayat') ? 'selected' : ''; ?>>Hayat</option>
+                                    <option value="Seyahat" <?php echo (isset($customer->offer_insurance_type) && $customer->offer_insurance_type == 'Seyahat') ? 'selected' : ''; ?>>Seyahat</option>
+                                    <option value="Diğer" <?php echo (isset($customer->offer_insurance_type) && $customer->offer_insurance_type == 'Diğer') ? 'selected' : ''; ?>>Diğer</option>
                                 </select>
                             </div>
                             <div class="ab-form-group">
                                 <label for="offer_amount">Teklif Tutarı (₺) *</label>
-                                <input type="number" name="offer_amount" id="offer_amount" step="0.01" min="0" required>
+                                <input type="number" name="offer_amount" id="offer_amount" step="0.01" min="0" value="<?php echo isset($customer->offer_amount) ? esc_attr($customer->offer_amount) : ''; ?>" required>
                             </div>
                         </div>
                         
                         <div class="ab-form-row">
                             <div class="ab-form-group">
                                 <label for="offer_expiry_date">Geçerlilik Tarihi *</label>
-                                <input type="date" name="offer_expiry_date" id="offer_expiry_date" required>
+                                <input type="date" name="offer_expiry_date" id="offer_expiry_date" value="<?php echo isset($customer->offer_expiry_date) ? esc_attr($customer->offer_expiry_date) : ''; ?>" required>
                             </div>
                             <div class="ab-form-group">
                                 <label for="offer_reminder">Hatırlatma</label>
                                 <select name="offer_reminder" id="offer_reminder">
-                                    <option value="0">Hayır</option>
-                                    <option value="1" selected>Evet</option>
+                                    <option value="0" <?php echo (isset($customer->offer_reminder) && $customer->offer_reminder == 0) ? 'selected' : ''; ?>>Hayır</option>
+                                    <option value="1" <?php echo (!isset($customer->offer_reminder) || $customer->offer_reminder == 1) ? 'selected' : ''; ?>>Evet</option>
                                 </select>
                             </div>
                         </div>
@@ -1154,7 +1147,7 @@ function format_file_size($size) {
                         <div class="ab-form-row">
                             <div class="ab-form-group ab-full-width">
                                 <label for="offer_notes">Teklif Notları</label>
-                                <textarea name="offer_notes" id="offer_notes" rows="3" placeholder="Teklif ile ilgili detaylar, özel koşullar veya müşteriyle yapılan görüşme notlarını buraya yazabilirsiniz..."></textarea>
+                                <textarea name="offer_notes" id="offer_notes" rows="3" placeholder="Teklif ile ilgili detaylar, özel koşullar veya müşteriyle yapılan görüşme notlarını buraya yazabilirsiniz..."><?php echo isset($customer->offer_notes) ? esc_textarea($customer->offer_notes) : ''; ?></textarea>
                             </div>
                         </div>
                         
@@ -1168,7 +1161,6 @@ function format_file_size($size) {
                         </div>
                     </form>
                 </div>
-                <?php endif; ?>
                 
                 <div class="ab-info-grid">
                     <div class="ab-info-item">
@@ -2118,33 +2110,83 @@ function format_file_size($size) {
     border: 1px solid #66bb6a;
 }
 
-/* Notlar Stilleri */
+/* Notlar Stilleri - Sticker/Baloncuk Tasarımı */
 .ab-notes-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 15px;
     margin-top: 15px;
 }
 
-.ab-note {
-    border: 1px solid #eee;
-    border-radius: 4px;
-    padding: 15px;
+.ab-note-item {
     position: relative;
-    background-color: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    padding: 15px 20px;
+    border-radius: 18px;
+    margin-bottom: 15px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    max-width: 85%;
 }
 
+.ab-note-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* Sağa ve sola yerleştirme efekti */
+.ab-note-item:nth-child(even) {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border: 2px solid #2196f3;
+}
+
+.ab-note-item:nth-child(odd) {
+    align-self: flex-start;
+    background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
+    border: 2px solid #4caf50;
+}
+
+/* Tür bazlı renkler korunuyor */
 .ab-note-positive {
-    border-left: 4px solid #4caf50;
+    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%) !important;
+    border: 2px solid #4caf50 !important;
 }
 
 .ab-note-negative {
-    border-left: 4px solid #f44336;
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%) !important;
+    border: 2px solid #f44336 !important;
 }
 
 .ab-note-neutral {
-    border-left: 4px solid #ff9800;
+    background: linear-gradient(135deg, #fff8e1 0%, #fff3c4 100%) !important;
+    border: 2px solid #ff9800 !important;
+}
+
+/* Baloncuk okları */
+.ab-note-item:nth-child(even)::before {
+    content: "";
+    position: absolute;
+    right: -10px;
+    top: 20px;
+    width: 0;
+    height: 0;
+    border-left: 10px solid;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+    border-left-color: inherit;
+}
+
+.ab-note-item:nth-child(odd)::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 20px;
+    width: 0;
+    height: 0;
+    border-right: 10px solid;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+    border-right-color: inherit;
 }
 
 .ab-note-header {
@@ -2158,24 +2200,30 @@ function format_file_size($size) {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    font-size: 13px;
+    font-size: 12px;
     color: #666;
+    font-weight: 500;
 }
 
 .ab-note-meta i {
     margin-right: 3px;
+    color: #888;
 }
 
 .ab-note-content {
     margin-bottom: 10px;
-    line-height: 1.5;
+    line-height: 1.6;
+    font-size: 14px;
+    color: #333;
+    font-weight: 400;
 }
 
 .ab-note-reason {
     font-size: 12px;
     color: #666;
     padding-top: 8px;
-    border-top: 1px dashed #eee;
+    border-top: 1px dashed rgba(0,0,0,0.2);
+    font-style: italic;
 }
 
 /* Badge Stilleri */
@@ -3791,100 +3839,9 @@ jQuery(document).ready(function($) {
     $('#cancel-offer-form').on('click', function() {
         $('#offer-form').slideUp();
         $('#toggle-offer-form').html('<i class="fas fa-plus"></i> Teklif Ver');
-        $('#offer-form-data')[0].reset();
+        if ($('#offer-form form')[0]) {
+            $('#offer-form form')[0].reset();
+        }
     });
-
-    // Teklif formu gönder
-    $('#offer-form-data').on('submit', function(e) {
-        e.preventDefault();
-        
-        var $btn = $('#save-offer-btn');
-        var originalText = $btn.html();
-        
-        // Form verilerini al
-        var formData = new FormData(this);
-        formData.append('has_offer', '1');
-        formData.append('ajax_update_offer', '1');
-        
-        // Butonu devre dışı bırak
-        $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...');
-        
-        $.ajax({
-            url: window.location.href,
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                try {
-                    // Clean response if needed
-                    var cleanResponse = response.trim();
-                    if (cleanResponse.charAt(0) !== '{') {
-                        var jsonStart = cleanResponse.indexOf('{');
-                        if (jsonStart !== -1) {
-                            cleanResponse = cleanResponse.substring(jsonStart);
-                        }
-                    }
-                    
-                    var data = JSON.parse(cleanResponse);
-                    
-                    if (data.success) {
-                        // Başarılı - sayfayı yenile
-                        showOfferResponse(data.message, 'success');
-                        setTimeout(function() {
-                            window.location.reload();
-                        }, 1500);
-                    } else {
-                        showOfferResponse(data.message, 'error');
-                    }
-                } catch (e) {
-                    console.error('Response parsing error:', e);
-                    console.log('Raw response:', response);
-                    
-                    // Eğer response'da başarı mesajı varsa başarılı kabul et
-                    if (response.includes('başarıyla') || response.includes('kaydedildi')) {
-                        showOfferResponse('Teklif bilgileri kaydedildi.', 'success');
-                        setTimeout(function() {
-                            window.location.reload();
-                        }, 1500);
-                    } else {
-                        showOfferResponse('Teklif kaydedildi ancak sayfa güncellemesi gerekiyor.', 'warning');
-                        setTimeout(function() {
-                            window.location.reload();
-                        }, 2000);
-                    }
-                }
-                
-                // Butonu tekrar etkinleştir
-                $btn.prop('disabled', false).html(originalText);
-            },
-            error: function(xhr, status, error) {
-                console.error('AJAX Error:', error);
-                showOfferResponse('Sunucu hatası. Lütfen daha sonra tekrar deneyin.', 'error');
-                
-                // Butonu tekrar etkinleştir
-                $btn.prop('disabled', false).html(originalText);
-            }
-        });
-    });
-
-    function showOfferResponse(message, type) {
-        // Mevcut mesajları temizle
-        $('.ab-offer-response').remove();
-        
-        // Yeni mesaj oluştur
-        var alertClass = 'ab-notice ab-' + type;
-        var alertHtml = '<div class="ab-offer-response ' + alertClass + '">' + message + '</div>';
-        
-        // Mesajı forma ekle
-        $('#offer-form').prepend(alertHtml);
-        
-        // Mesajı otomatik kaldır
-        setTimeout(function() {
-            $('.ab-offer-response').fadeOut(500, function() {
-                $(this).remove();
-            });
-        }, 5000);
-    }
 });
 </script>

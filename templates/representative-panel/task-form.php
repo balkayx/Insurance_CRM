@@ -147,13 +147,22 @@ if (empty($users)) {
     ]);
 }
 
-// Müşterileri çek
+// Müşterileri çek - doğru tablo adıyla
 $customers = $wpdb->get_results("
-    SELECT id, customer_name, first_name, last_name, tc_identity, phone, customer_type, company_name 
+    SELECT id, first_name, last_name, tc_identity, phone, category, company_name 
     FROM {$wpdb->prefix}insurance_crm_customers 
     WHERE status = 'aktif' 
-    ORDER BY customer_name ASC
+    ORDER BY first_name, last_name ASC
 ");
+
+// Eğer müşteri bulunamazsa alternatif sorgu dene
+if (empty($customers)) {
+    $customers = $wpdb->get_results("
+        SELECT id, first_name, last_name, tc_identity, phone, category, company_name 
+        FROM {$wpdb->prefix}insurance_crm_customers 
+        ORDER BY first_name, last_name ASC
+    ");
+}
 
 error_log("Task form - Found " . count($users) . " assignable users");
 error_log("Task form - Found " . count($customers) . " customers");
@@ -501,16 +510,16 @@ error_log("Task form - Found " . count($customers) . " customers");
                     <option value="">Müşteri Seçiniz...</option>
                     <?php foreach ($customers as $customer): ?>
                         <?php 
-                        $display_name = !empty($customer->customer_name) ? $customer->customer_name : $customer->first_name . ' ' . $customer->last_name;
-                        if ($customer->customer_type === 'kurumsal' && !empty($customer->company_name)) {
-                            $display_name = $customer->company_name;
+                        $display_name = $customer->first_name . ' ' . $customer->last_name;
+                        if ($customer->category === 'kurumsal' && !empty($customer->company_name)) {
+                            $display_name = $customer->company_name . ' (' . $customer->first_name . ' ' . $customer->last_name . ')';
                         }
                         ?>
                         <option value="<?php echo esc_attr($customer->id); ?>" 
-                                data-type="<?php echo esc_attr($customer->customer_type); ?>"
+                                data-type="<?php echo esc_attr($customer->category); ?>"
                                 data-name="<?php echo esc_attr($display_name); ?>">
                             <?php echo esc_html($display_name); ?> 
-                            (<?php echo esc_html($customer->customer_type === 'kurumsal' ? 'Kurumsal' : 'Bireysel'); ?>)
+                            (<?php echo esc_html($customer->category === 'kurumsal' ? 'Kurumsal' : 'Bireysel'); ?>)
                             <?php if (!empty($customer->tc_identity)): ?>
                                 - TC: <?php echo esc_html($customer->tc_identity); ?>
                             <?php endif; ?>

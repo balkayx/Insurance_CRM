@@ -343,9 +343,9 @@ if (isset($_POST['save_customer']) && isset($_POST['customer_nonce']) && wp_veri
                     create_offer_reminder_task($customer_id, $customer_data);
                 }
                 
-                // Başarılı işlemden sonra yönlendirme
+                // Başarılı işlemden sonra yönlendirme - view sayfasına git
                 $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
-                echo '<script>window.location.href = "?view=customers&updated=true";</script>';
+                echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
                 exit;
             } else {
                 $message = 'Müşteri güncellenirken bir hata oluştu: ' . $wpdb->last_error;

@@ -4474,18 +4474,23 @@ include_once __DIR__ . '/loader.php';
             </div>
         <?php elseif ($current_view == 'organization'): ?>
             <div class="main-content">
-                <!-- Modern Header -->
-                <div class="page-header-modern">
-                    <div class="header-content">
-                        <div class="header-left">
-                            <h1><i class="fas fa-sitemap"></i> Organizasyon Yönetimi</h1>
-                            <p class="header-subtitle">Genel organizasyon yapısını görüntüleyin ve yönetin</p>
+                <!-- Kurumsal Header -->
+                <div class="ab-customer-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+                    <div class="ab-customer-title">
+                        <h1 style="color: white; margin: 0; display: flex; align-items: center; gap: 15px; font-size: 28px;">
+                            <i class="fas fa-sitemap" style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;"></i> 
+                            Organizasyon Yönetimi
+                        </h1>
+                        <div class="ab-customer-meta" style="margin-top: 10px;">
+                            <span style="color: rgba(255,255,255,0.9); font-size: 16px;">
+                                <i class="fas fa-chart-line"></i> Genel organizasyon yapısını görüntüleyin ve yönetin
+                            </span>
                         </div>
-                        <div class="header-right">
-                            <a href="<?php echo generate_panel_url('dashboard'); ?>" class="btn-modern btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Dashboard'a Dön
-                            </a>
-                        </div>
+                    </div>
+                    <div class="ab-customer-actions">
+                        <a href="<?php echo generate_panel_url('dashboard'); ?>" class="ab-btn ab-btn-secondary" style="background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.3); color: white;">
+                            <i class="fas fa-arrow-left"></i> Dashboard'a Dön
+                        </a>
                     </div>
                 </div>
                 
