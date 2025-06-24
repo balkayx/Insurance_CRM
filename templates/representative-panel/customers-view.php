@@ -781,7 +781,7 @@ function format_file_size($size) {
 <div class="ab-customer-details">
     
     <!-- Müşteri Başlık Bilgisi -->
-    <div class="ab-customer-header" style="padding: 20px;">
+    <div class="ab-customer-header" style="padding: 20px 40px;">
         <div class="ab-customer-title">
             <h1><i class="fas fa-user"></i> <?php echo esc_html($customer->first_name . ' ' . $customer->last_name); ?></h1>
             <div class="ab-customer-meta">
@@ -835,7 +835,7 @@ function format_file_size($size) {
     <div id="ajax-response-container"></div>
     
     <!-- Müşteri Bilgileri -->
-    <div class="ab-panels" style="padding: 0 20px;">
+    <div class="ab-panels" style="padding: 0 40px;">
         <div class="ab-panel ab-panel-personal" style="--panel-color: <?php echo esc_attr($personal_color); ?>">
             <div class="ab-panel-header">
                 <h3><i class="fas fa-user-circle"></i> Kişisel Bilgiler</h3>
@@ -1224,15 +1224,16 @@ function format_file_size($size) {
                         </div>
                     </div>
                     
-                    <div class="ab-info-grid" style="grid-template-columns: 1fr 1fr;">
                         <div class="ab-info-item">
                             <div class="ab-info-label">Teklif Vadesi</div>
                             <div class="ab-info-value">
                                 <?php echo !empty($customer->offer_expiry_date) ? date('d.m.Y', strtotime($customer->offer_expiry_date)) : '<span class="no-value">Belirtilmemiş</span>'; ?>
                             </div>
+                        </div>
                     </div>
                     
                     <div class="ab-info-grid" style="grid-template-columns: 1fr 1fr;">
+                    
                         <div class="ab-info-item">
                             <div class="ab-info-label">Teklif Dosyası</div>
                             <div class="ab-info-value ab-offer-file">

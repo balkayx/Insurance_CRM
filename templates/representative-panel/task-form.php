@@ -118,30 +118,6 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'add_task') {
     }
 }
 
-// AJAX handler for getting customer policies in task form
-if (isset($_POST['action']) && $_POST['action'] === 'get_customer_policies_task_form') {
-    if (!wp_verify_nonce($_POST['nonce'], 'get_policies_task_nonce')) {
-        echo json_encode(['success' => false, 'message' => 'Güvenlik kontrolü başarısız']);
-        exit;
-    }
-    
-    $customer_id = intval($_POST['customer_id']);
-    
-    // customers-view.php'deki sorguyu kullan
-    $policies_table = $wpdb->prefix . 'insurance_crm_policies';
-    $policies = $wpdb->get_results($wpdb->prepare("
-        SELECT * FROM $policies_table 
-        WHERE customer_id = %d
-        ORDER BY end_date ASC
-    ", $customer_id));
-    
-    echo json_encode([
-        'success' => true,
-        'policies' => $policies ?: []
-    ]);
-    exit;
-}
-
 // Müşteri temsilcilerini çek (policies-form.php referansı ile)
 $representatives_table = $wpdb->prefix . 'insurance_crm_representatives';
 $users = $wpdb->get_results("
@@ -959,6 +935,28 @@ jQuery(document).ready(function($) {
 // AJAX handlers
 add_action('wp_ajax_search_customers_for_tasks', 'handle_search_customers_for_tasks');
 add_action('wp_ajax_get_customer_policies_for_tasks', 'handle_get_customer_policies_for_tasks');
+add_action('wp_ajax_get_customer_policies_task_form', 'handle_get_customer_policies_task_form');
+
+function handle_get_customer_policies_task_form() {
+    if (!wp_verify_nonce($_POST['nonce'], 'get_policies_task_nonce')) {
+        wp_send_json_error('Güvenlik kontrolü başarısız');
+        return;
+    }
+    
+    global $wpdb;
+    $customer_id = intval($_POST['customer_id']);
+    
+    $policies_table = $wpdb->prefix . 'insurance_crm_policies';
+    $policies = $wpdb->get_results($wpdb->prepare("
+        SELECT * FROM $policies_table 
+        WHERE customer_id = %d
+        ORDER BY end_date ASC
+    ", $customer_id));
+    
+    wp_send_json_success([
+        'policies' => $policies ?: []
+    ]);
+}
 
 function handle_search_customers_for_tasks() {
     if (!wp_verify_nonce($_POST['nonce'], 'search_customers_nonce')) {
