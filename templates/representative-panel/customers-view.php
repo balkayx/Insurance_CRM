@@ -781,7 +781,7 @@ function format_file_size($size) {
 <div class="ab-customer-details">
     
     <!-- Müşteri Başlık Bilgisi -->
-    <div class="ab-customer-header" style="padding: 0 20px;">
+    <div class="ab-customer-header" style="padding: 20px;">
         <div class="ab-customer-title">
             <h1><i class="fas fa-user"></i> <?php echo esc_html($customer->first_name . ' ' . $customer->last_name); ?></h1>
             <div class="ab-customer-meta">
@@ -1284,8 +1284,8 @@ function format_file_size($size) {
                 </div>
                 
                 <!-- Sonlandırma Modal -->
-                <div id="terminate-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;">
+                <div id="terminate-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+                    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h3><i class="fas fa-times-circle"></i> Teklif Sonlandırma</h3>
                             <button type="button" onclick="closeTerminateModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
@@ -1371,20 +1371,14 @@ function format_file_size($size) {
                 </div>
 
                 <!-- Mevcut Notlar -->
-                <div class="ab-notes-list" style="display: flex; flex-wrap: wrap; gap: 15px;">
+                <div class="ab-notes-list" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 15px;">
                     <?php if (empty($customer_notes)): ?>
-                    <div class="ab-empty-state" style="width: 100%;">
-                       <center> <p><i class="fas fa-comments"></i><br>Henüz görüşme notu eklenmemiş.</p></center>
+                    <div class="ab-empty-state" style="grid-column: 1 / -1; text-align: center;">
+                        <p><i class="fas fa-comments"></i><br>Henüz görüşme notu eklenmemiş.</p>
                     </div>
                     <?php else: ?>
-                        <?php 
-                        $note_count = 0;
-                        foreach ($customer_notes as $note): 
-                            $note_count++;
-                            if ($note_count > 5 && $note_count % 5 == 1): ?>
-                                </div><div class="ab-notes-list" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px;">
-                        <?php endif; ?>
-                        <div class="ab-sticky-note sticky-note-<?php echo esc_attr($note->note_type); ?>" style="flex: 0 0 calc(20% - 12px); min-width: 200px;">
+                        <?php foreach ($customer_notes as $note): ?>
+                        <div class="ab-sticky-note sticky-note-<?php echo esc_attr($note->note_type); ?>">
                             <div class="sticky-note-header">
                                 <div class="sticky-note-meta">
                                     <span class="sticky-note-user">
@@ -4318,7 +4312,8 @@ jQuery(document).ready(function($) {
     
     // Sonlandırma modal fonksiyonları
     window.showTerminateModal = function(customerId) {
-        document.getElementById('terminate-modal').style.display = 'block';
+        var modal = document.getElementById('terminate-modal');
+        modal.style.display = 'flex'; // flex kullanarak center align
     };
     
     window.closeTerminateModal = function() {

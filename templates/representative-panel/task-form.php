@@ -145,11 +145,11 @@ if (isset($_POST['action']) && $_POST['action'] === 'get_customer_policies_task_
 // Müşteri temsilcilerini çek (policies-form.php referansı ile)
 $representatives_table = $wpdb->prefix . 'insurance_crm_representatives';
 $users = $wpdb->get_results("
-    SELECT r.id, r.user_id, u.display_name, r.first_name, r.last_name, r.role_name
+    SELECT r.id, u.display_name, r.title 
     FROM $representatives_table r
     LEFT JOIN {$wpdb->users} u ON r.user_id = u.ID
     WHERE r.status = 'active'
-    ORDER BY u.display_name ASC
+    ORDER BY u.display_name
 ");
 
 // Debug için log ekle
@@ -158,7 +158,7 @@ if (empty($users)) {
     error_log("Hiç temsilci bulunamadı, alternatif sorgu deneniyor...");
     $users = $wpdb->get_results("
         SELECT r.id, r.user_id, 
-               CONCAT(r.first_name, ' ', r.last_name) as display_name, r.role_name
+               CONCAT(r.first_name, ' ', r.last_name) as display_name, r.title
         FROM $representatives_table r
         WHERE r.status = 'active'
         ORDER BY r.first_name, r.last_name
@@ -602,13 +602,13 @@ error_log("Task form - Found " . count($customers) . " customers");
                         <option value="">Kişi Seçin</option>
                         <?php if (!empty($users)): ?>
                             <?php foreach ($users as $user): 
-                                $role_name = !empty($user->role_name) ? $user->role_name : '';
-                                $display_name = !empty($user->display_name) ? $user->display_name : $user->first_name . ' ' . $user->last_name;
+                                $title = !empty($user->title) ? $user->title : '';
+                                $display_name = !empty($user->display_name) ? $user->display_name : '';
                             ?>
                                 <option value="<?php echo $user->id; ?>">
                                     <?php echo esc_html($display_name); ?> 
-                                    <?php if ($role_name): ?>
-                                        (<?php echo esc_html($role_name); ?>)
+                                    <?php if ($title): ?>
+                                        (<?php echo esc_html($title); ?>)
                                     <?php endif; ?>
                                 </option>
                             <?php endforeach; ?>

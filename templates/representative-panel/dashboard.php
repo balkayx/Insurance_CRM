@@ -4807,6 +4807,7 @@ include_once __DIR__ . '/loader.php';
 // Ayarları al
 $settings = get_option('insurance_crm_settings', array());
 $sidebar_color = isset($settings['site_appearance']['sidebar_color']) ? $settings['site_appearance']['sidebar_color'] : '#1e293b';
+$primary_color = isset($settings['site_appearance']['primary_color']) ? $settings['site_appearance']['primary_color'] : '#1976d2';
 ?>
 
 :root {
