@@ -1,7 +1,8 @@
 <?php
 /**
  * Müşteri Detay Sayfası
- * @version 3.3.0
+ * @version 3.4.0
+ * @description Teklif formu ve görev validasyonu iyileştirmeleri
  */
 
 // Yetki kontrolü
@@ -1277,9 +1278,100 @@ function format_file_size($size) {
                     </div>
                     <?php endif; ?>
                 </div>
-                
-                <!-- Sonlandırma Modal -->
-                <div id="terminate-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+            </div>
+        </div>
+
+        <!-- Teklif Ekleme Formu -->
+        <div id="quote-form-section" class="ab-panel ab-panel-offer modern-quote-form" style="--panel-color: <?php echo esc_attr($offer_color); ?>; display: none;">
+            <div class="quote-form-header">
+                <div class="quote-form-icon">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <div class="quote-form-title">
+                    <h4>Teklif Bilgileri Ekle</h4>
+                    <p>Müşteri için teklif bilgilerini girin ve hatırlatma ayarlarını yapın</p>
+                </div>
+            </div>
+            <div class="modern-form-container">
+                <form method="post" action="">
+                    <input type="hidden" name="action" value="update_offer">
+                    <input type="hidden" name="customer_id" value="<?php echo $customer->id; ?>">
+                    <?php wp_nonce_field('update_customer_offer', 'offer_nonce'); ?>
+                    
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label class="modern-label" for="offer_insurance_type">
+                                <i class="fas fa-shield-alt"></i>
+                                Sigorta Türü
+                            </label>
+                            <select name="offer_insurance_type" id="offer_insurance_type" class="modern-input modern-select" required>
+                                <option value="">Sigorta türü seçin</option>
+                                <option value="TSS">Trafik Sigortası (TSS)</option>
+                                <option value="Kasko">Kasko</option>
+                                <option value="DASK">DASK</option>
+                                <option value="Konut">Konut Sigortası</option>
+                                <option value="İşyeri">İşyeri Sigortası</option>
+                                <option value="Sağlık">Sağlık Sigortası</option>
+                                <option value="Yaşam">Yaşam Sigortası</option>
+                                <option value="Seyahat">Seyahat Sigortası</option>
+                                <option value="Diğer">Diğer</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label class="modern-label" for="offer_amount">
+                                <i class="fas fa-lira-sign"></i>
+                                Teklif Tutarı (₺)
+                            </label>
+                            <input type="number" name="offer_amount" id="offer_amount" class="modern-input" 
+                                   placeholder="0.00" step="0.01" min="0" required>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label class="modern-label" for="offer_expiry_date">
+                                <i class="fas fa-calendar-alt"></i>
+                                Teklif Geçerlilik Tarihi
+                            </label>
+                            <input type="date" name="offer_expiry_date" id="offer_expiry_date" class="modern-input" required>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label class="modern-label">
+                                <i class="fas fa-bell"></i>
+                                Hatırlatma Ayarı
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                                <input type="checkbox" name="offer_reminder" id="offer_reminder" value="1" checked>
+                                <span>Vade tarihinden 1 gün önce hatırlatma görevi oluştur</span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-field full-width">
+                            <label class="modern-label" for="offer_notes">
+                                <i class="fas fa-sticky-note"></i>
+                                Teklif Notları
+                            </label>
+                            <textarea name="offer_notes" id="offer_notes" class="modern-input modern-textarea" 
+                                      placeholder="Teklif ile ilgili notlarınızı buraya yazın..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn-large btn-primary">
+                            <i class="fas fa-save"></i>
+                            Teklif Kaydet
+                        </button>
+                        <button type="button" class="btn-large btn-secondary" onclick="cancelQuoteForm()">
+                            <i class="fas fa-times"></i>
+                            İptal
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Sonlandırma Modal -->
+        <div id="terminate-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
                     <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h3><i class="fas fa-times-circle"></i> Teklif Sonlandırma</h3>
@@ -4238,12 +4330,26 @@ jQuery(document).ready(function($) {
         }
     };
 
-    // Quote toggle functionality (txt dosyasından)
+    // Quote toggle functionality
     window.toggleOfferStatus = function(newStatus) {
         if (newStatus === 1) {
             // Show quote form
-            document.getElementById('quote-form-section').style.display = 'block';
-            document.getElementById('quote-form-section').scrollIntoView({ behavior: 'smooth' });
+            const quoteFormSection = document.getElementById('quote-form-section');
+            if (quoteFormSection) {
+                quoteFormSection.style.display = 'block';
+                quoteFormSection.scrollIntoView({ behavior: 'smooth' });
+                
+                // Set default expiry date to 1 month from today
+                const today = new Date();
+                const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+                const expDateField = document.getElementById('offer_expiry_date');
+                if (expDateField) {
+                    expDateField.value = nextMonth.toISOString().split('T')[0];
+                }
+            } else {
+                console.error('quote-form-section element not found');
+                alert('Teklif formu yüklenemedi. Sayfa yenilenerek tekrar deneyin.');
+            }
         } else {
             // Change status to No without showing form
             if (confirm('Teklif durumunu "Hayır" olarak değiştirmek istediğinizden emin misiniz?')) {
@@ -4253,7 +4359,15 @@ jQuery(document).ready(function($) {
     };
     
     window.cancelQuoteForm = function() {
-        document.getElementById('quote-form-section').style.display = 'none';
+        const quoteFormSection = document.getElementById('quote-form-section');
+        if (quoteFormSection) {
+            quoteFormSection.style.display = 'none';
+            // Reset the form
+            const form = quoteFormSection.querySelector('form');
+            if (form) {
+                form.reset();
+            }
+        }
     };
     
     function updateOfferStatusDirectly(status) {
@@ -4281,30 +4395,6 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // Teklif formu toggle
-    $('#toggle-offer-form').on('click', function() {
-        $('#offer-form').slideToggle();
-        var btn = $(this);
-        if ($('#offer-form').is(':visible')) {
-            btn.html('<i class="fas fa-minus"></i> Kapat');
-            // Bugünün tarihini default olarak ayarla
-            var today = new Date();
-            var nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-            $('#offer_expiry_date').val(nextMonth.toISOString().split('T')[0]);
-        } else {
-            btn.html('<i class="fas fa-plus"></i> Teklif Ver');
-        }
-    });
-
-    // Teklif formu iptal
-    $('#cancel-offer-form').on('click', function() {
-        $('#offer-form').slideUp();
-        $('#toggle-offer-form').html('<i class="fas fa-plus"></i> Teklif Ver');
-        if ($('#offer-form form')[0]) {
-            $('#offer-form form')[0].reset();
-        }
-    });
-    
     // Sonlandırma modal fonksiyonları
     window.showTerminateModal = function(customerId) {
         var modal = document.getElementById('terminate-modal');

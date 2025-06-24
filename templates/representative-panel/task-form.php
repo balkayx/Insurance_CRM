@@ -1,10 +1,10 @@
 <?php
 /**
  * Görev Ekleme/Düzenleme Formu
- * @version 2.0.0
+ * @version 2.1.0
  * @date 2025-06-23
  * @author anadolubirlik
- * @description Policies-form.php tarzında yeniden tasarlandı
+ * @description Validasyon hatası ve poliçe hizalama iyileştirmeleri
  */
 
 include_once(dirname(__FILE__) . '/template-colors.php');
@@ -79,16 +79,22 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'add_task') {
     $priority = sanitize_text_field($_POST['priority']);
     $current_user_id = get_current_user_id();
 
+    // Debug logging
+    error_log("Task form submission - task_title: '$task_title', customer_id: '$customer_id', assigned_to: '$assigned_to'");
+
     // Validation
     $errors = [];
     if (empty($task_title)) {
         $errors[] = 'Görev başlığı gereklidir.';
+        error_log("Task form validation error: empty task_title");
     }
     if (empty($customer_id)) {
         $errors[] = 'Müşteri seçimi gereklidir.';
+        error_log("Task form validation error: empty customer_id");
     }
     if (empty($assigned_to)) {
         $errors[] = 'Görev atanacak kişi seçimi gereklidir.';
+        error_log("Task form validation error: empty assigned_to");
     }
 
     if (empty($errors)) {
@@ -352,6 +358,9 @@ error_log("Task form - Found " . count($all_policies) . " policies");
         border-radius: 4px;
         margin-bottom: 8px;
         transition: all 0.3s ease;
+        display: flex;
+        align-items: flex-start;
+        padding: 10px;
     }
 
     .policy-radio-item:hover {
@@ -359,23 +368,29 @@ error_log("Task form - Found " . count($all_policies) . " policies");
         border-color: <?php echo $corporate_color; ?>;
     }
 
+    .policy-radio-item.selected {
+        background: <?php echo adjust_color_opacity($corporate_color, 0.1); ?>;
+        border-color: <?php echo $corporate_color; ?>;
+    }
+
     .policy-radio {
         margin: 0;
-        margin-right: 8px;
+        margin-right: 12px;
+        margin-top: 2px;
+        flex-shrink: 0;
     }
 
     .policy-label {
-        display: block;
-        padding: 10px;
         cursor: pointer;
         margin: 0;
         font-weight: normal;
+        flex: 1;
+        line-height: 1.4;
     }
 
     .policy-radio:checked + .policy-label {
-        background: <?php echo adjust_color_opacity($corporate_color, 0.1); ?>;
         color: <?php echo $corporate_color; ?>;
-        border-radius: 4px;
+        font-weight: 500;
     }
 
     .task-details-section {
@@ -859,6 +874,10 @@ jQuery(document).ready(function($) {
         $('#selected_policy_id').val(selectedPolicyId);
         console.log('📋 Seçilen poliçe ID:', selectedPolicyId);
         
+        // Remove selected class from all policy items and add to current one
+        $('.policy-radio-item').removeClass('selected');
+        $(this).closest('.policy-radio-item').addClass('selected');
+        
         // Uncheck continue without policy
         $('#continueWithoutPolicy').prop('checked', false);
     });
@@ -867,6 +886,7 @@ jQuery(document).ready(function($) {
     $('#continueWithoutPolicy').on('change', function() {
         if ($(this).is(':checked')) {
             $('.policy-radio').prop('checked', false);
+            $('.policy-radio-item').removeClass('selected');
             $('#selected_policy_id').val('');
             console.log('✅ Poliçe seçmeden devam et işaretlendi');
         }
