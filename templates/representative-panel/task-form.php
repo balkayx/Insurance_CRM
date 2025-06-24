@@ -626,60 +626,100 @@ jQuery(document).ready(function($) {
     // Müşteri arama
     $('#customerSearch').on('input', function() {
         const searchTerm = $(this).val().trim();
+        console.log('🔤 Input değişti:', searchTerm, 'Uzunluk:', searchTerm.length);
         
         clearTimeout(searchTimeout);
         
         if (searchTerm.length < 2) {
             $('#customerSearchResults').hide();
+            console.log('👋 Arama çok kısa, sonuçlar gizlendi');
             return;
         }
         
+        console.log('⏰ Arama timeout ayarlandı');
         searchTimeout = setTimeout(function() {
             searchCustomers(searchTerm);
         }, 500);
     });
     
     function searchCustomers(term) {
-        console.log('🔍 Müşteri aranıyor:', term);
+        console.log('🔍 AJAX çağrısı başlatılıyor. Arama terimi:', term);
+        console.log('🌐 AJAX URL:', ajaxurl);
+        
+        const requestData = {
+            action: 'search_customers_for_task',
+            search_term: term,
+            nonce: '<?php echo wp_create_nonce("customer_search"); ?>'
+        };
+        
+        console.log('📤 Gönderilen veri:', requestData);
         
         $.ajax({
             url: ajaxurl,
             type: 'POST',
-            data: {
-                action: 'search_customers_for_task',
-                search_term: term,
-                nonce: '<?php echo wp_create_nonce("customer_search"); ?>'
+            data: requestData,
+            beforeSend: function() {
+                console.log('⏳ AJAX isteği gönderiliyor...');
+                $('#customerSearchResults').html('<div class="customer-search-item">Aranıyor...</div>').show();
             },
             success: function(response) {
-                console.log('📥 AJAX yanıtı alındı:', response);
-                if (response.success && response.data) {
+                console.log('✅ AJAX başarılı yanıt alındı:', response);
+                console.log('📊 Yanıt tipi:', typeof response, 'Success:', response.success);
+                
+                if (response.success && response.data && Array.isArray(response.data)) {
+                    console.log('📋 Müşteri sayısı:', response.data.length);
                     displaySearchResults(response.data);
                 } else {
-                    console.log('❌ Arama başarısız:', response);
+                    console.log('❌ Arama başarısız veya veri bulunamadı:', response);
                     $('#customerSearchResults').html('<div class="customer-search-item">Müşteri bulunamadı</div>').show();
                 }
             },
             error: function(xhr, status, error) {
-                console.error('❌ AJAX hatası:', {xhr, status, error});
-                $('#customerSearchResults').html('<div class="customer-search-item">Arama sırasında hata oluştu</div>').show();
+                console.error('❌ AJAX hatası:');
+                console.error('  XHR:', xhr);
+                console.error('  Status:', status);
+                console.error('  Error:', error);
+                console.error('  Response Text:', xhr.responseText);
+                $('#customerSearchResults').html('<div class="customer-search-item">Arama sırasında hata oluştu: ' + error + '</div>').show();
             }
         });
     }
     
     function displaySearchResults(customers) {
-        console.log('📋 Arama sonuçları gösteriliyor:', customers);
+        console.log('📋 Arama sonuçları işleniyor. Müşteri sayısı:', customers.length);
+        console.log('👥 Müşteri verileri:', customers);
+        
+        if (!Array.isArray(customers) || customers.length === 0) {
+            console.log('⚠️ Müşteri verisi boş veya geçersiz');
+            $('#customerSearchResults').html('<div class="customer-search-item">Müşteri bulunamadı</div>').show();
+            return;
+        }
         
         let html = '';
-        customers.forEach(function(customer) {
+        customers.forEach(function(customer, index) {
+            console.log(`👤 Müşteri ${index + 1}:`, customer);
+            
+            // Determine customer type and display name
             const customerType = customer.customer_type === 'kurumsal' ? 'Kurumsal' : 'Bireysel';
             const customerName = customer.customer_type === 'kurumsal' ? 
-                customer.company_name : 
-                customer.first_name + ' ' + customer.last_name;
+                (customer.company_name || 'Şirket adı belirtilmemiş') : 
+                ((customer.first_name || '') + ' ' + (customer.last_name || '')).trim();
+            
             const customerInfo = customer.customer_type === 'kurumsal' ? 
                 'VKN: ' + (customer.tax_number || 'Belirtilmemiş') : 
                 'TC: ' + (customer.tc_identity || 'Belirtilmemiş');
             
-            html += `<div class="customer-search-item" data-customer-id="${customer.id}" 
+            console.log(`  📝 Görüntü adı: "${customerName}"`);
+            console.log(`  🏢 Tür: ${customerType}`);
+            console.log(`  📄 Bilgi: ${customerInfo}`);
+            
+            if (customerName.trim() === '') {
+                console.log('⚠️ Müşteri adı boş, atlaniyor');
+                return;
+            }
+            
+            html += `<div class="customer-search-item" 
+                           data-customer-id="${customer.id}" 
                            data-customer-name="${customerName}" 
                            data-customer-type="${customer.customer_type}">
                         <strong>${customerName}</strong> (${customerType})<br>
@@ -687,31 +727,45 @@ jQuery(document).ready(function($) {
                      </div>`;
         });
         
-        $('#customerSearchResults').html(html).show();
-        console.log('✅ Arama sonuçları HTML güncellendi');
+        if (html === '') {
+            console.log('❌ HTML içeriği boş');
+            $('#customerSearchResults').html('<div class="customer-search-item">Gösterilecek müşteri bulunamadı</div>').show();
+        } else {
+            console.log('✅ HTML içeriği oluşturuldu, gösteriliyor');
+            $('#customerSearchResults').html(html).show();
+        }
     }
     
     // Müşteri seçimi
     $(document).on('click', '.customer-search-item', function() {
         console.log('🖱️ Müşteri öğesine tıklandı');
+        console.log('🎯 Tıklanan element:', this);
         
-        if ($(this).data('customer-id')) {
-            const customerId = $(this).data('customer-id');
-            const customerName = $(this).data('customer-name');
-            const customerType = $(this).data('customer-type');
-            
-            console.log('📦 Seçilen müşteri verileri:', {customerId, customerName, customerType});
-            
+        const customerId = $(this).data('customer-id');
+        const customerName = $(this).data('customer-name');
+        const customerType = $(this).data('customer-type');
+        
+        console.log('📦 Okunan veri attributeleri:');
+        console.log('  🆔 ID:', customerId);
+        console.log('  👤 İsim:', customerName);
+        console.log('  🏢 Tür:', customerType);
+        
+        if (customerId && customerName) {
+            console.log('✅ Veriler geçerli, müşteri seçiliyor');
             selectCustomer(customerId, customerName, customerType);
             $('#customerSearchResults').hide();
             $('#customerSearch').val(customerName);
         } else {
-            console.error('❌ Müşteri ID bulunamadı');
+            console.error('❌ Müşteri ID veya isim bulunamadı');
+            console.error('  Mevcut data attributeleri:', $(this).data());
         }
     });
     
     function selectCustomer(customerId, customerName, customerType) {
-        console.log('👤 Müşteri seçiliyor:', {customerId, customerName, customerType});
+        console.log('👤 Müşteri seçme işlemi başlatılıyor:');
+        console.log('  🆔 Müşteri ID:', customerId);
+        console.log('  👤 Müşteri Adı:', customerName);
+        console.log('  🏢 Müşteri Türü:', customerType);
         
         selectedCustomer = {
             id: customerId,
@@ -719,9 +773,11 @@ jQuery(document).ready(function($) {
             type: customerType
         };
         
+        // Hidden field'ı güncelle
         $('#selected_customer_id').val(customerId);
-        console.log('🔑 Hidden field güncellendi:', $('#selected_customer_id').val());
+        console.log('🔑 Hidden field güncellendi. Değer:', $('#selected_customer_id').val());
         
+        // Display customer info
         $('.selected-customer-name').text(customerName);
         $('.selected-customer-info').text(`Müşteri Tipi: ${customerType === 'kurumsal' ? 'Kurumsal' : 'Bireysel'}`);
         $('#selectedCustomerInfo').show();
@@ -730,7 +786,13 @@ jQuery(document).ready(function($) {
         $('.task-details-section').show().addClass('enabled');
         $('#submitBtn').prop('disabled', false);
         
+        console.log('🎯 UI güncellendi:');
+        console.log('  📊 Müşteri bilgisi paneli gösterildi');
+        console.log('  ⚙️ Görev detayları bölümü etkinleştirildi');
+        console.log('  🔘 Submit butonu etkinleştirildi');
+        
         // Müşterinin poliçelerini yükle
+        console.log('📋 Müşteri poliçeleri yükleniyor...');
         loadCustomerPolicies(customerId);
     }
     
