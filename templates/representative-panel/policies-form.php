@@ -405,6 +405,36 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
         
         if ($result) {
             $new_policy_id = $wpdb->insert_id;
+            
+            // If this policy was created from an offer, update the customer's offer status
+            if (!empty($customer_search_value) && (!empty($offer_type) || !empty($offer_amount))) {
+                $customer_name_parts = explode(' ', trim($customer_search_value));
+                if (count($customer_name_parts) >= 2) {
+                    $first_name = $customer_name_parts[0];
+                    $last_name = implode(' ', array_slice($customer_name_parts, 1));
+                    
+                    // Find customer by name and update offer status
+                    $customer_for_offer_update = $wpdb->get_row($wpdb->prepare(
+                        "SELECT id FROM {$wpdb->prefix}insurance_crm_customers 
+                        WHERE first_name = %s AND last_name = %s AND has_offer = 1 
+                        LIMIT 1",
+                        $first_name, $last_name
+                    ));
+                    
+                    if ($customer_for_offer_update) {
+                        $wpdb->update(
+                            $wpdb->prefix . 'insurance_crm_customers',
+                            array(
+                                'has_offer' => 2, // 2 = Completed/Converted to Policy
+                                'offer_notes' => 'Teklif poliçeye dönüştürüldü. Poliçe ID: ' . $new_policy_id
+                            ),
+                            array('id' => $customer_for_offer_update->id)
+                        );
+                        error_log("Offer status updated for customer ID: " . $customer_for_offer_update->id . " to completed");
+                    }
+                }
+            }
+            
             $message = 'Poliçe başarıyla eklendi.';
             $message_type = 'success';
             $_SESSION['crm_notice'] = '<div class="ab-notice ab-' . $message_type . '">' . $message . '</div>';
@@ -1949,7 +1979,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (customerSearchValue && customerSearchValue.trim() !== '') {
         console.log('🔍 URL parametresinden müşteri aranıyor:', customerSearchValue);
         setTimeout(() => {
-            searchCustomers(customerSearchValue.trim());
+            searchCustomers(customerSearchValue.trim(), true); // Auto-select flag
         }, 100);
     }
 });
@@ -2042,8 +2072,8 @@ function setupInteractiveFlow() {
     });
     
     // Müşteri arama fonksiyonu
-    function searchCustomers(query) {
-        console.log('🔍 Müşteri aranıyor:', query);
+    function searchCustomers(query, autoSelect = false) {
+        console.log('🔍 Müşteri aranıyor:', query, autoSelect ? '(otomatik seçim aktif)' : '');
         
         // AJAX URL kontrolü
         const ajaxUrl = '<?php echo admin_url('admin-ajax.php'); ?>';
@@ -2092,7 +2122,7 @@ function setupInteractiveFlow() {
                 const data = JSON.parse(text);
                 console.log('✅ JSON parse başarılı:', data);
                 if (data.success && data.data) {
-                    displaySearchResults(data.data);
+                    displaySearchResults(data.data, autoSelect);
                 } else {
                     console.log('❌ Arama başarısız:', data.data || 'Veri yok');
                     searchResults.innerHTML = '<div class="search-result-item"><i class="fas fa-exclamation-circle"></i> Müşteri bulunamadı</div>';
@@ -2159,7 +2189,7 @@ function setupInteractiveFlow() {
     }
     
     // Arama sonuçlarını göster
-    function displaySearchResults(customers) {
+    function displaySearchResults(customers, autoSelect = false) {
         if (customers.length === 0) {
             searchResults.innerHTML = '<div class="search-result-item"><i class="fas fa-info-circle"></i> Müşteri bulunamadı</div>';
             return;
@@ -2183,6 +2213,16 @@ function setupInteractiveFlow() {
             `;
         });
         searchResults.innerHTML = html;
+        
+        // Auto-select first customer if requested and there's exactly one result
+        if (autoSelect && customers.length === 1) {
+            console.log('🎯 Tek sonuç bulundu, otomatik seçiliyor:', customers[0]);
+            setTimeout(() => {
+                selectCustomer(customers[0]);
+                searchResults.style.display = 'none';
+            }, 500);
+            return;
+        }
         
         // Müşteri seçim event'i
         searchResults.querySelectorAll('.search-result-item').forEach((item, index) => {
@@ -2726,17 +2766,6 @@ function showPolicyDetailsSteps() {
     // Brüt prim alanını kontrol et ve göster (edit/renewal modunda)
     updateGrossPremiumField();
     
-    // Sayfayı poliçe detaylarına yumuşak geçiş yap
-    setTimeout(() => {
-        const firstPolicySection = document.querySelector('.policy-details-step');
-        if (firstPolicySection) {
-            firstPolicySection.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
-        }
-    }, 300);
-    
     console.log('✅ Poliçe detayları bölümleri başarıyla gösterildi');
 }
 
@@ -2786,9 +2815,7 @@ function setupExistingFunctionality() {
         startDateInput.addEventListener('change', function() {
             // Başlangıç tarihi değiştiğinde, bitiş tarihini otomatik olarak 1 yıl sonraya ayarla
             const startDate = new Date(this.value);
-            const endDate = new Date(endDateInput.value);
-            
-            if (startDate >= endDate) {
+            if (this.value) {
                 const newEndDate = new Date(startDate);
                 newEndDate.setFullYear(newEndDate.getFullYear() + 1);
                 endDateInput.value = newEndDate.toISOString().split('T')[0];

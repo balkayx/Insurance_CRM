@@ -95,7 +95,13 @@ if (isset($_POST['save_policy']) && isset($_POST['policy_nonce']) && wp_verify_n
         'premium_amount' => floatval($_POST['premium_amount']),
         'gross_premium' => isset($_POST['gross_premium']) ? floatval($_POST['gross_premium']) : null,
         'payment_info' => isset($_POST['payment_info']) ? sanitize_text_field($_POST['payment_info']) : '',
-        'insured_list' => isset($_POST['selected_insured']) ? implode(', ', array_map('sanitize_text_field', $_POST['selected_insured'])) : '',
+        'insured_list' => isset($_POST['selected_insured']) ? implode(', ', array_map(function($item) {
+            // Extract name from "Name (Relation)" format
+            if (preg_match('/^(.+?)\s*\([^)]+\)$/', trim($item), $matches)) {
+                return sanitize_text_field(trim($matches[1]));
+            }
+            return sanitize_text_field(trim($item));
+        }, $_POST['selected_insured'])) : '',
         'status' => sanitize_text_field($_POST['status']),
         'updated_at' => current_time('mysql')
     );
@@ -217,6 +223,10 @@ if ($renewing) {
     $policy->end_date = date('Y-m-d', strtotime($policy->end_date . ' +1 year'));
 }
 
+// Varsayılan poliçe türleri
+$settings = get_option('insurance_crm_settings', []);
+$policy_types = $settings['default_policy_types'] ?? ['Kasko', 'Trafik', 'Konut', 'DASK', 'Sağlık', 'Hayat', 'Seyahat', 'Diğer'];
+
 // Prepare family members for insured selection
 $family_members = array();
 $family_members[] = array(
@@ -247,7 +257,7 @@ if (!empty($customer->children_names)) {
     }
 }
 
-$selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insured_list) : array();
+$selected_insured = !empty($policy->insured_list) ? array_map('trim', explode(', ', $policy->insured_list)) : array();
 ?>
 
 <div class="wrap">
@@ -345,7 +355,7 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
                             <label class="ab-checkbox-label">
                                 <input type="checkbox" name="selected_insured[]" 
                                        value="<?php echo esc_attr($member['name'] . ' (' . $member['relation'] . ')'); ?>"
-                                       <?php echo in_array($member['name'] . ' (' . $member['relation'] . ')', $selected_insured) ? 'checked' : ''; ?>>
+                                       <?php echo in_array($member['name'], $selected_insured) ? 'checked' : ''; ?>>
                                 <span class="family-member-info">
                                     <strong><?php echo esc_html($member['name']); ?></strong>
                                     <small><?php echo esc_html($member['relation'] . ($member['tc'] ? ' - TC: ' . $member['tc'] : '')); ?></small>
@@ -369,13 +379,11 @@ $selected_insured = !empty($policy->insured_list) ? explode(', ', $policy->insur
                         <label for="policy_type">Poliçe Türü *</label>
                         <select name="policy_type" id="policy_type" class="ab-input" required onchange="updateGrossPremiumField()">
                             <option value="">Seçiniz</option>
-                            <option value="TSS" <?php selected($policy->policy_type, 'TSS'); ?>>TSS</option>
-                            <option value="Kasko" <?php selected($policy->policy_type, 'Kasko'); ?>>Kasko</option>
-                            <option value="Trafik" <?php selected($policy->policy_type, 'Trafik'); ?>>Trafik</option>
-                            <option value="Konut" <?php selected($policy->policy_type, 'Konut'); ?>>Konut</option>
-                            <option value="İşyeri" <?php selected($policy->policy_type, 'İşyeri'); ?>>İşyeri</option>
-                            <option value="Seyahat" <?php selected($policy->policy_type, 'Seyahat'); ?>>Seyahat</option>
-                            <option value="Diğer" <?php selected($policy->policy_type, 'Diğer'); ?>>Diğer</option>
+                            <?php foreach ($policy_types as $type): ?>
+                            <option value="<?php echo esc_attr($type); ?>" <?php selected($policy->policy_type, $type); ?>>
+                                <?php echo esc_html($type); ?>
+                            </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                 </div>

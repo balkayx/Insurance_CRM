@@ -177,7 +177,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'create_reminder_task' && is
     }
     
     // Sayfayı yenile
-    echo '<script>window.location.href = "?view=customers-view&id=' . $customer_id . '";</script>';
+    echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
     exit;
 }
 
@@ -214,7 +214,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && iss
     }
     
     // Sayfayı yenile
-    echo '<script>window.location.href = "?view=customers-view&id=' . $customer_id . '";</script>';
+    echo '<script>window.location.href = "?view=customers&action=view&id=' . $customer_id . '";</script>';
     exit;
 }
 
