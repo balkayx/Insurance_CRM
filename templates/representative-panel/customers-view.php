@@ -4,6 +4,9 @@
  * @version 3.3.0
  */
 
+// Start output buffering to prevent output before AJAX responses
+ob_start();
+
 // Yetki kontrolü
 if (!is_user_logged_in() || !isset($_GET['id'])) {
     return;
@@ -31,140 +34,6 @@ if (isset($_POST['action']) && $_POST['action'] === 'create_reminder_task' && is
         // create_offer_reminder_task fonksiyonunu include et
         if (file_exists(dirname(__FILE__) . '/customers-form.php')) {
             require_once(dirname(__FILE__) . '/customers-form.php');
-        }
-        
-        // Eğer fonksiyon hala tanımlı değilse, burada tanımla
-        if (!function_exists('create_offer_reminder_task')) {
-            function create_offer_reminder_task($customer_id, $offer_data) {
-                global $wpdb;
-                
-                // Debug log
-                error_log("create_offer_reminder_task called for customer $customer_id with data: " . print_r($offer_data, true));
-                
-                // Teklif hatırlatması aktif değilse veya vade tarihi yoksa çık
-                if (empty($offer_data['offer_reminder']) || empty($offer_data['offer_expiry_date'])) {
-                    error_log("create_offer_reminder_task: Early exit - offer_reminder: " . ($offer_data['offer_reminder'] ?? 'empty') . ", offer_expiry_date: " . ($offer_data['offer_expiry_date'] ?? 'empty'));
-                    return;
-                }
-                
-                $tasks_table = $wpdb->prefix . 'insurance_crm_tasks';
-                $customers_table = $wpdb->prefix . 'insurance_crm_customers';
-                
-                // Önce tasks tablosunun yapısını kontrol et
-                $columns = $wpdb->get_results("DESCRIBE {$tasks_table}");
-                $column_names = array();
-                foreach ($columns as $col) {
-                    $column_names[] = $col->Field;
-                }
-                error_log("Tasks table columns: " . implode(', ', $column_names));
-                
-                // Müşteri bilgilerini al (temsilci ID'si dahil)
-                $customer = $wpdb->get_row($wpdb->prepare(
-                    "SELECT first_name, last_name, phone, representative_id FROM {$customers_table} WHERE id = %d",
-                    $customer_id
-                ));
-                
-                if (!$customer) {
-                    error_log("create_offer_reminder_task: Customer not found for ID $customer_id");
-                    return;
-                }
-                
-                error_log("Customer found: " . $customer->first_name . " " . $customer->last_name . ", rep_id: " . $customer->representative_id);
-                
-                // Hatırlatma tarihini hesapla (vade tarihinden 1 gün önce saat 10:00)
-                $expiry_date = date('Y-m-d', strtotime($offer_data['offer_expiry_date']));
-                $reminder_date = date('Y-m-d', strtotime($expiry_date . ' -1 day'));
-                $reminder_datetime = $reminder_date . ' 10:00:00';
-                
-                // Görev başlığı ve açıklaması
-                $task_title = "Teklif hatırlatma görevi";
-                $task_description = "Teklif hatırlatma görevi\n\n";
-                $task_description .= "Müşteri Adı Soyadı: " . $customer->first_name . " " . $customer->last_name . "\n";
-                $task_description .= "Telefon: " . $customer->phone . "\n";
-                $task_description .= "Teklif İçeriği: " . ($offer_data['offer_insurance_type'] ?? 'TSS') . " - " . ($offer_data['offer_amount'] ? number_format($offer_data['offer_amount'], 2, ',', '.') . ' TL' : '20,000.00 TL') . "\n";
-                $task_description .= "Teklif Vade Tarihi: " . date('d.m.Y', strtotime($expiry_date)) . "\n\n";
-                $task_description .= "Müşteriyi arayarak teklif durumunu kontrol ediniz.";
-                
-                // Temsilci atama mantığı: 
-                // 1. Müşteriye zaten bir temsilci atanmışsa o temsilciyi kullan
-                // 2. Yoksa işlemi yapan kullanıcıyı ata
-                $assigned_representative_id = $customer->representative_id;
-                if (!$assigned_representative_id) {
-                    $assigned_representative_id = get_current_user_rep_id();
-                }
-                
-                error_log("Assigned representative ID: $assigned_representative_id");
-                
-                // Sütun adlarına göre task_data'yı dinamik olarak oluştur
-                $task_data = array(
-                    'customer_id' => $customer_id,
-                    'representative_id' => $assigned_representative_id,
-                    'priority' => 'medium',
-                    'status' => 'pending', 
-                    'due_date' => $reminder_datetime
-                );
-                
-                // task_title sütunu varsa ekle
-                if (in_array('task_title', $column_names)) {
-                    $task_data['task_title'] = $task_title;
-                }
-                
-                // task_description sütunu varsa ekle
-                if (in_array('task_description', $column_names)) {
-                    $task_data['task_description'] = $task_description;
-                }
-                
-                // title sütunu varsa ekle (eski sistem için)
-                if (in_array('title', $column_names)) {
-                    $task_data['title'] = $task_title;
-                }
-                
-                // description sütunu varsa ekle (eski sistem için)
-                if (in_array('description', $column_names)) {
-                    $task_data['description'] = $task_description;
-                }
-                
-                // task_type sütunu varsa ekle
-                if (in_array('task_type', $column_names)) {
-                    $task_data['task_type'] = 'teklif_hatirlatma';
-                }
-                
-                // created_at sütunu varsa ekle
-                if (in_array('created_at', $column_names)) {
-                    $task_data['created_at'] = current_time('mysql');
-                }
-                
-                // updated_at sütunu varsa ekle
-                if (in_array('updated_at', $column_names)) {
-                    $task_data['updated_at'] = current_time('mysql');
-                }
-                
-                error_log("Task data prepared: " . print_r($task_data, true));
-                
-                // Önceki bekleyen teklif hatırlatma görevlerini kontrol et ve sil
-                $delete_conditions = array(
-                    'customer_id' => $customer_id,
-                    'status' => 'pending'
-                );
-                
-                // task_type sütunu varsa koşula ekle
-                if (in_array('task_type', $column_names)) {
-                    $delete_conditions['task_type'] = 'teklif_hatirlatma';
-                }
-                
-                $deleted = $wpdb->delete($tasks_table, $delete_conditions);
-                error_log("Deleted previous tasks: $deleted");
-                
-                // Yeni görevi ekle
-                $result = $wpdb->insert($tasks_table, $task_data);
-                
-                if ($result) {
-                    error_log("SUCCESS: Offer reminder task created for customer {$customer_id}, assigned to representative {$assigned_representative_id}, due date: {$reminder_datetime}");
-                } else {
-                    error_log("FAILED to create offer reminder task for customer {$customer_id}: " . $wpdb->last_error);
-                    error_log("Last query: " . $wpdb->last_query);
-                }
-            }
         }
         
         // Hatırlatma görevi oluştur
@@ -198,6 +67,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && iss
     // Validate customer ID
     if (empty($customer_id) || $customer_id <= 0) {
         if ($is_ajax) {
+            // Clean any output buffer before sending JSON
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
             header('Content-Type: application/json');
             echo json_encode(array('success' => false, 'data' => 'Geçersiz müşteri ID'));
             exit;
@@ -222,13 +95,26 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && iss
     if ($result !== false) {
         // Create reminder task if requested
         if ($quote_data['offer_reminder'] == 1 && !empty($quote_data['offer_expiry_date'])) {
+            // Debug: Log the customer_id before calling the function
+            error_log("About to call create_offer_reminder_task with customer_id: $customer_id");
+            
             if (!function_exists('create_offer_reminder_task')) {
                 require_once(dirname(__FILE__) . '/customers-form.php');
             }
-            create_offer_reminder_task($customer_id, $quote_data);
+            
+            // Make sure customer_id is still valid
+            if ($customer_id > 0) {
+                create_offer_reminder_task($customer_id, $quote_data);
+            } else {
+                error_log("ERROR: Customer ID is 0 before calling create_offer_reminder_task");
+            }
         }
         
         if ($is_ajax) {
+            // Clean any output buffer before sending JSON
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
             header('Content-Type: application/json');
             echo json_encode(array('success' => true, 'data' => 'Teklif bilgileri başarıyla güncellendi.'));
             exit;
@@ -239,6 +125,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_quote_status' && iss
         }
     } else {
         if ($is_ajax) {
+            // Clean any output buffer before sending JSON
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
             header('Content-Type: application/json');
             echo json_encode(array('success' => false, 'data' => 'Teklif bilgileri güncellenirken hata oluştu.'));
             exit;
